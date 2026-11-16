@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# build output
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+
+# deploys
+.open-next/
+.wrangler/
+freebuff-sites-build/
+
+# verification screenshots
+artifacts/
+
+# local secrets — never commit
+.secrets/
+.env
+.env*.local
+
+.DS_Store
