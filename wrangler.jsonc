@@ -1,0 +1,37 @@
+// Worker config for deploying this site to your own Cloudflare account.
+// Freebuff Sites keeps its own generated config (freebuff.wrangler.jsonc); this
+// file is the one the GitHub Actions deploy job uses via `opennextjs-cloudflare deploy`.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "brewing-paddock",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public", "enable_ctx_exports"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+  // ISR cache for the race pages and the cached forecast.
+  "r2_buckets": [
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "brewing-paddock-cache"
+    }
+  ],
+  // OpenNext's revalidation queue and tag cache are Durable Objects.
+  "durable_objects": {
+    "bindings": [
+      { "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" },
+      { "name": "NEXT_TAG_CACHE_DO_SHARDED", "class_name": "DOShardedTagCache" }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["DOQueueHandler", "DOShardedTagCache"]
+    }
+  ]
+}
