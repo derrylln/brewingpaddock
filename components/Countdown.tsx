@@ -6,7 +6,7 @@ function pad(n: number): string {
   return String(Math.max(0, n)).padStart(2, "0");
 }
 
-export default function Countdown({ date }: { date: string }) {
+export default function Countdown({ date, variant = "card" }: { date: string; variant?: "card" | "inline" }) {
   const [left, setLeft] = useState<number | null>(null);
 
   useEffect(() => {
@@ -22,6 +22,16 @@ export default function Countdown({ date }: { date: string }) {
   const hours = Math.floor((total % 86400000) / 3600000);
   const minutes = Math.floor((total % 3600000) / 60000);
   const seconds = Math.floor((total % 60000) / 1000);
+
+  if (variant === "inline") {
+    return (
+      <span className="countdown-inline mono" aria-live="off">
+        {left === null
+          ? "--d --h --m --s"
+          : `${pad(days)}d ${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`}
+      </span>
+    );
+  }
 
   return (
     <div className="countdown" aria-live="off">

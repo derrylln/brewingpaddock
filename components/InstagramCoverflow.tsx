@@ -44,15 +44,17 @@ export default function InstagramCoverflow({ posts, handle, url, variant = "sect
       className={compact ? "ig ig-hero" : "ig"}
       aria-label={`Latest from @${handle}`}
     >
-      <div className={compact ? "ig-head ig-head-compact" : "ig-head"}>
-        <div>
-          <p className="mono kicker-red">The feed · @{handle}</p>
-          {compact ? null : <h2 className="ig-title">Straight from the paddock</h2>}
+      {compact ? null : (
+        <div className="ig-head">
+          <div>
+            <p className="mono kicker-red">The feed · @{handle}</p>
+            <h2 className="ig-title">Straight from the paddock</h2>
+          </div>
+          <a className="text-link mono ig-follow" href={url} target="_blank" rel="noopener noreferrer">
+            Follow on Instagram ↗
+          </a>
         </div>
-        <a className="text-link mono ig-follow" href={url} target="_blank" rel="noopener noreferrer">
-          Follow on Instagram ↗
-        </a>
-      </div>
+      )}
 
       <div className="ig-stage">
         <div

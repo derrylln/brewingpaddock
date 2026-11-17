@@ -28,54 +28,53 @@ export default async function HomePage() {
     <>
       <section className="hero">
         <HeroTrace />
-        <div className="shell hero-grid">
-          <div className="hero-main">
+        <div className="shell hero-feed">
+          <div className="hero-topline">
             <p className="hero-kicker mono">
               <span className="slash">///</span> The paddock desk · {season} season · round{" "}
               {overview.completedRounds} of {schedule.length}
             </p>
-            <h1 className="sr-only">Brewing Paddock — F1, brewed strong</h1>
-            <InstagramCoverflow
-              posts={igPosts}
-              handle={instagramHandle}
-              url={instagramUrl}
-              variant="hero"
-            />
-            <div className="hero-actions">
-              <Link className="btn btn-primary" href="/news">
-                Read the wire
-              </Link>
-              <Link className="btn btn-ghost" href="/telemetry">
-                Open telemetry
-              </Link>
-            </div>
+            <a
+              className="text-link mono hero-follow"
+              href={instagramUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              @{instagramHandle} ↗
+            </a>
+          </div>
+          <h1 className="sr-only">Brewing Paddock — F1, brewed strong</h1>
+          <InstagramCoverflow
+            posts={igPosts}
+            handle={instagramHandle}
+            url={instagramUrl}
+            variant="hero"
+          />
+          <div className="hero-actions">
+            <Link className="btn btn-primary" href="/news">
+              Read the wire
+            </Link>
+            <Link className="btn btn-ghost" href="/telemetry">
+              Open telemetry
+            </Link>
           </div>
 
-          <aside className="hero-side">
-            {nextRace ? (
-              <div className="race-card ticks">
-                <div className="race-card-head">
-                  <span className="mono kicker-red">Next on the grid</span>
-                  <span className="mono race-round">R{String(nextRace.round).padStart(2, "0")}</span>
-                </div>
-                <h2 className="race-card-title">{nextRace.raceName.replace(" Grand Prix", "")}</h2>
-                <p className="race-card-sub">
-                  {nextRace.Circuit.Location.locality}, {nextRace.Circuit.Location.country}
-                </p>
-                <Countdown date={nextRace.date} />
-                <div className="race-card-foot">
-                  <span className="mono">{raceDay(nextRace.date)}</span>
-                  <span className="mono">{daysUntil(nextRace.date)} days out</span>
-                </div>
-              </div>
-            ) : (
-              <div className="race-card ticks">
-                <span className="mono kicker-red">Season complete</span>
-                <h2 className="race-card-title">See you in March</h2>
-                <p className="race-card-sub">The calendar is done. The archive is open.</p>
-              </div>
-            )}
-          </aside>
+          {nextRace ? (
+            <div className="next-strip ticks">
+              <span className="mono kicker-red">Next</span>
+              <span className="next-strip-race">{nextRace.raceName.replace(" Grand Prix", "")}</span>
+              <span className="mono next-strip-meta">{raceDay(nextRace.date)}</span>
+              <Countdown date={nextRace.date} variant="inline" />
+              <span className="mono next-strip-meta next-strip-out">
+                {daysUntil(nextRace.date)} days out
+              </span>
+            </div>
+          ) : (
+            <div className="next-strip">
+              <span className="mono kicker-red">Season complete</span>
+              <span className="mono next-strip-meta">The calendar is done, the archive is open</span>
+            </div>
+          )}
         </div>
 
         <div className="shell">

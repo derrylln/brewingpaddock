@@ -4250,3 +4250,153 @@ select.input {
   font-size: 9px;
   letter-spacing: 0.16em;
 }
+
+/* Hero, full-bleed feed: one column, the cover flow owns the width, the race
+   card is reduced to a single strip under the buttons. */
+.hero-feed {
+  position: relative;
+  z-index: 2;
+}
+
+.hero-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.hero-topline .hero-kicker {
+  margin-bottom: 0;
+}
+
+.hero-follow {
+  color: var(--dim);
+}
+
+.hero-follow:hover {
+  color: var(--red);
+}
+
+.ig-hero {
+  margin-top: 16px;
+}
+
+.ig-hero .ig-stage {
+  height: clamp(300px, 33vw, 540px);
+  perspective: 1600px;
+}
+
+.ig-hero .ig-card {
+  width: clamp(200px, 25vw, 410px);
+  --swing: 40%;
+}
+
+.ig-hero .ig-foot {
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.ig-hero .ig-caption {
+  flex: 0 1 auto;
+  max-width: 52ch;
+}
+
+/* The next-race countdown, reduced to one line. */
+.next-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  margin-top: 26px;
+  padding: 13px 0 2px;
+}
+
+.next-strip-race {
+  font-family: var(--font-poster);
+  font-size: 19px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.next-strip-meta {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.next-strip-out {
+  margin-left: auto;
+}
+
+.countdown-inline {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-feed + .shell .hero-stats {
+  margin-top: 22px;
+}
+
+@media (max-width: 760px) {
+  .ig-hero .ig-stage {
+    height: 400px;
+  }
+
+  .ig-hero .ig-card {
+    width: 72vw;
+    --swing: 34%;
+  }
+
+  .ig-hero .ig-foot {
+    flex-wrap: wrap;
+  }
+
+  .ig-hero .ig-caption {
+    max-width: none;
+  }
+
+  .next-strip {
+    gap: 10px;
+  }
+
+  .next-strip-out {
+    margin-left: 0;
+  }
+}
+
+/* Use the width: spread the fan wider and trim the vertical rhythm. */
+.ig-hero .ig-stage {
+  height: clamp(300px, 31vw, 510px);
+}
+
+.ig-hero .ig-card {
+  width: clamp(200px, 24vw, 390px);
+  --swing: 50%;
+}
+
+.hero-actions {
+  margin-top: 20px;
+}
+
+.next-strip {
+  margin-top: 18px;
+  padding-top: 11px;
+}
+
+@media (max-width: 760px) {
+  .ig-hero .ig-stage {
+    height: 400px;
+  }
+
+  .ig-hero .ig-card {
+    width: 76vw;
+    --swing: 36%;
+  }
+}
