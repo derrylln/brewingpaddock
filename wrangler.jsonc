@@ -1,12 +1,15 @@
 // Worker config for deploying this site to your own Cloudflare account.
 // Freebuff Sites keeps its own generated config (freebuff.wrangler.jsonc); this
-// file is the one the GitHub Actions deploy job uses via `opennextjs-cloudflare deploy`.
+// file is the one Cloudflare Workers Builds uses.
+//
+// No R2 binding: R2 is the only product here that asks for a payment method.
+// The ISR cache lives in Workers KV instead, which is free and needs no card.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "brewing-paddock",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-10-01",
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public", "enable_ctx_exports"],
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -14,14 +17,17 @@
   "observability": {
     "enabled": true
   },
-  // ISR cache for the race pages and the cached forecast.
-  "r2_buckets": [
+  // ISR cache. Create the namespace once in the dashboard
+  // (Storage & databases → Workers KV → Create instance, name it `brewing-paddock-cache`),
+  // then paste its ID here in place of the zeros.
+  "kv_namespaces": [
     {
-      "binding": "NEXT_INC_CACHE_R2_BUCKET",
-      "bucket_name": "brewing-paddock-cache"
+      "binding": "NEXT_INC_CACHE_KV",
+      "id": "00000000000000000000000000000000"
     }
   ],
-  // OpenNext's revalidation queue and tag cache are Durable Objects.
+  // OpenNext's revalidation queue and tag cache are Durable Objects. These are
+  // free on the Workers Free plan (SQLite-backed) and need no setup.
   "durable_objects": {
     "bindings": [
       { "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" },

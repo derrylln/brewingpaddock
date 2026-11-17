@@ -49,8 +49,10 @@ read and labels itself `model only` rather than erroring. Generation is capped p
 The repo is wired for Cloudflare **Workers Builds** (Git integration): push to `main` and Cloudflare
 builds and deploys. No Cloudflare token and no GitHub Actions secret lives in this repository.
 
-1. Create the R2 bucket the ISR cache binds to: **Storage & databases → R2 → Create bucket**, named
-   `brewing-paddock-cache`. R2 needs a payment method on the account; usage at this size bills $0.
+1. Create the ISR cache: **Storage & databases → Workers KV → Create instance**, named
+   `brewing-paddock-cache`. Copy its **ID** and paste it into `wrangler.jsonc` in place of the zeros in
+   `NEXT_INC_CACHE_KV`. KV is free and needs no payment method — unlike R2, which is why the cache is
+   on KV here.
 2. **Workers & Pages → Create → Worker → Connect to Git**, pick `derrylln/brewingpaddock`, branch `main`.
 3. Name the Worker **`brewing-paddock`** — it must match `name` in `wrangler.jsonc` or the build fails.
 4. Build command: `npm run build:worker` · Deploy command: `npm run deploy:worker`.
@@ -59,7 +61,8 @@ builds and deploys. No Cloudflare token and no GitHub Actions secret lives in th
 6. Push a commit (or Deployments → Retry) to build and deploy.
 
 Free-plan allowances in play: Workers Builds 3,000 build minutes/month, Workers 100,000 requests/day,
-SQLite-backed Durable Objects on the free tier, and the R2 free tier for the cache.
+Workers KV (100,000 reads + 1,000 writes/day), and SQLite-backed Durable Objects on the free tier. No
+payment method and no paid plan are required anywhere in this setup.
 
 The Freebuff preview at `freebuff.page` is a separate deployment with its own secret; publishing
 there is unaffected by any of the above.
