@@ -14,6 +14,21 @@ npm run typecheck
 Data sources: Jolpica (standings, results, calendar), OpenF1 (telemetry), seven RSS news desks.
 A bundled snapshot in `data/snapshot.json` covers the season when Jolpica rate-limits the host.
 
+## Theme and type
+
+The light/dark switch in the header writes `bp-theme` to localStorage and sets
+`data-theme` on `<html>`; an inline script in `app/layout.tsx` applies it before
+first paint, so there is no flash. Dark is the default. Every colour is a token
+in `app/globals.css` (`--bg`, `--ink`, `--red`, plus the `--wash-rgb` overlay
+channel), with the light palette under `:root[data-theme="light"]` — new surfaces
+should use those tokens rather than hard-coded hexes.
+
+Display type is **Magistral**, a licensed ParaType face, so the repo ships the
+free stand-in **Chakra Petch** (squared, Eurostile-lineage) in its place. The
+stack already lists `Magistral` first: buy the woff2 files, drop them in
+`public/fonts/`, and uncomment the `@font-face` block at the end of
+`app/globals.css`. The "Brewed by Brewing Paddock" footer line is Times New Roman.
+
 ## AI
 
 Each module ships a deterministic model that owns the numbers — stint simulation, Monte Carlo,

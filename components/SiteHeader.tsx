@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import BrandMark from "@/components/BrandMark";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const NAV = [
   { href: "/", label: "Desk" },
@@ -19,11 +21,7 @@ export default function SiteHeader() {
     <header className="site-header">
       <div className="site-header-inner">
         <Link href="/" className="brand" aria-label="Brewing Paddock home">
-          <span className="brand-mark" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
+          <BrandMark className="brand-mark" />
           <span className="brand-word">
             <em>Brewing</em> Paddock
           </span>
@@ -46,6 +44,7 @@ export default function SiteHeader() {
         </nav>
 
         <div className="header-right">
+          <ThemeToggle />
           <span className="header-season">2026</span>
           <span className="live-pill">
             <span className="live-dot" aria-hidden="true" />

@@ -294,8 +294,8 @@ export default function TelemetryDashboard() {
             stroke="rgba(244,243,239,0.35)"
             strokeDasharray="3 3"
           />
-          <circle cx={activeX} cy={speedY(comparison.a.v[activeIndex])} r="3.5" fill={a.colour} stroke="#08090A" strokeWidth="1.5" />
-          <circle cx={activeX} cy={speedY(comparison.b.v[activeIndex])} r="3.5" fill={b.colour} stroke="#08090A" strokeWidth="1.5" />
+          <circle cx={activeX} cy={speedY(comparison.a.v[activeIndex])} r="3.5" fill={a.colour} stroke="var(--bg)" strokeWidth="1.5" />
+          <circle cx={activeX} cy={speedY(comparison.b.v[activeIndex])} r="3.5" fill={b.colour} stroke="var(--bg)" strokeWidth="1.5" />
         </svg>
       </div>
 

@@ -1,8 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Brewing Paddock">
-  <rect width="64" height="64" fill="#08090A"/>
-  <g fill="#E10600" transform="skewX(-12) translate(8 0)">
-    <rect x="16" y="13" width="9" height="38"/>
-    <rect x="30" y="21" width="9" height="30"/>
-    <rect x="44" y="29" width="9" height="22"/>
+  <rect width="64" height="64" fill="#08090a"/>
+  <defs>
+    <clipPath id="b">
+      <rect x="8" y="12" width="48" height="40" rx="1.5"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#b)">
+    <rect x="8" y="12" width="48" height="40" fill="#ffffff"/>
+    <rect x="8" y="18" width="48" height="9" fill="#e4002b"/>
+    <rect x="8" y="35" width="48" height="9" fill="#e4002b"/>
+  </g>
+  <g fill="none" stroke="#f5a11c" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M23 16c-3.6 5.4 3.6 8.6 0 14s3.6 8.6 0 14"/>
+    <path d="M32 16c-3.6 5.4 3.6 8.6 0 14s3.6 8.6 0 14"/>
+    <path d="M41 16c-3.6 5.4 3.6 8.6 0 14s3.6 8.6 0 14"/>
   </g>
 </svg>
