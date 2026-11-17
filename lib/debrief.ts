@@ -112,11 +112,18 @@ export function buildDebrief(args: {
 
   const paragraphs: string[] = [];
   if (winner) {
+    const victoryPath =
+      Number(winner.grid) === 1
+        ? "converted pole position into victory"
+        : `fought through from P${winner.grid} to take the win`;
+
     paragraphs.push(
-      `The race turned on ${winner.Constructor.name}'s read of the first stint. ${winnerName} started P${winner.grid}, ${
-        Number(winner.grid) === 1 ? "controlled the launch and never gave the lead away" : "worked through the order without ever looking rushed"
-      }, and finished ${margin ? `${margin.replace("+", "")} clear of ${second?.Driver.familyName}` : "at the front"}. ${
-        teamFinishers > 1 ? `Both cars scored for ${winnerTeam} — a proper pit-wall day.` : `The sister car could not back it up.`
+      `The race turned on ${winner.Constructor.name}'s read of the race pace and stint management. ${winnerName} started P${winner.grid}, ${victoryPath}, and finished ${
+        margin ? `${margin.replace("+", "")} clear of ${second?.Driver.familyName}` : "at the front"
+      }. ${
+        teamFinishers > 1
+          ? `Both cars scored for ${winnerTeam} — a proper pit-wall day.`
+          : `The sister car could not back it up.`
       }`,
     );
   }
@@ -144,11 +151,21 @@ export function buildDebrief(args: {
       }`,
     );
   }
-  paragraphs.push(
-    pole
-      ? `${pole.Driver.familyName} took qualifying, but Saturday is not Sunday. ${winnerTeam}'s Sunday execution is the headline the pit wall will take to the next round.`
-      : `${winnerTeam} leaves with the biggest data set of the weekend and the same question every rival is asking: how much of this was track-specific?`,
-  );
+  if (pole && winner) {
+    if (pole.Driver.driverId === winner.Driver.driverId) {
+      paragraphs.push(
+        `${pole.Driver.familyName} converted Saturday pole into Sunday victory, with ${winnerTeam}'s execution setting the benchmark heading into the next round.`,
+      );
+    } else {
+      paragraphs.push(
+        `${pole.Driver.familyName} took qualifying, but Saturday is not Sunday. ${winnerTeam}'s race pace and strategy turned the tables when the points were actually paid.`,
+      );
+    }
+  } else {
+    paragraphs.push(
+      `${winnerTeam} leaves with the biggest data set of the weekend and the same question every rival is asking: how much of this was track-specific?`,
+    );
+  }
 
   return {
     headline,
