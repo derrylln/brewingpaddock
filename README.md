@@ -22,6 +22,31 @@ the upload in the repo root and squared. The favicon is `app/icon.png`, generate
 from the same file. Swap either by replacing that file; colour and size come from
 `.brand-mark` in `app/globals.css` (34px in the header).
 
+## Instagram feed
+
+The homepage cover flow reads from `lib/instagram.ts`. With an
+`INSTAGRAM_TOKEN` in the environment it calls the Instagram API with Instagram
+Login (`graph.instagram.com/me/media`, cached 30 min); without one it renders the
+curated list in `data/instagram.json`, which is what ships today.
+
+To go live:
+
+1. The account must be **Business or Creator** (Instagram app → Settings → Account
+   type). Personal accounts cannot be read by any Meta API since the Basic Display
+   API was retired on 4 December 2024.
+2. Create a Meta app at developers.facebook.com with the **Instagram** product and
+   the `instagram_business_basic` permission, then generate a long-lived access
+   token for @brewingpaddock.
+3. Store it as a secret named `INSTAGRAM_TOKEN` — on Freebuff Sites under **Sites →
+   Secrets**, on your own Worker with `wrangler secret put INSTAGRAM_TOKEN`.
+4. Redeploy. `GET /api/instagram` shows what the section is serving (source:
+   `instagram` or `curated`).
+
+Long-lived tokens last about 60 days; refresh before they expire or the section
+falls back to the curated list. The placeholder tiles in `public/instagram/` are
+generated brand artwork — replace entries in `data/instagram.json` (or configure
+the token) to show real posts.
+
 ## Theme and type
 
 The light/dark switch in the header writes `bp-theme` to localStorage and sets

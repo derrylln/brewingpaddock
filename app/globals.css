@@ -3855,3 +3855,233 @@ select.input {
   border: 0;
   border-radius: 0;
 }
+
+/* ── Instagram cover flow ────────────────────────────────────────────────────
+   One post square to the camera, neighbours rotated and pushed back on each
+   side. Depth is done with transforms only, so it stays cheap and the cards
+   remain real links/buttons. */
+.ig {
+  padding: 6px 0 42px;
+}
+
+.ig-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 10px;
+}
+
+.ig-title {
+  font-family: var(--font-poster);
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: -0.015em;
+  text-transform: uppercase;
+  font-size: clamp(26px, 3.4vw, 44px);
+  line-height: 0.96;
+  margin-top: 8px;
+}
+
+.ig-follow {
+  white-space: nowrap;
+  padding-bottom: 4px;
+}
+
+.ig-stage {
+  position: relative;
+  height: clamp(330px, 40vw, 520px);
+  perspective: 1500px;
+  perspective-origin: 50% 46%;
+}
+
+.ig-track {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  touch-action: pan-y;
+}
+
+.ig-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(196px, 23vw, 330px);
+  aspect-ratio: 4 / 5;
+  padding: 0;
+  border: 0;
+  background: none;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.35s ease;
+  will-change: transform;
+  cursor: pointer;
+  --swing: 44%;
+}
+
+.ig-card.is-active {
+  cursor: default;
+}
+
+.ig-frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  box-shadow: 0 26px 50px -28px rgba(var(--shadow-rgb), 0.5);
+}
+
+.ig-card.is-active .ig-frame {
+  border-color: rgba(225, 6, 0, 0.5);
+  box-shadow: 0 38px 74px -32px rgba(var(--shadow-rgb), 0.55);
+}
+
+.ig-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ig-badge {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  background: rgba(var(--bg-rgb), 0.72);
+  color: var(--ink);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  backdrop-filter: blur(6px);
+}
+
+.ig-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-2);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 30;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.ig-arrow:hover {
+  border-color: var(--red);
+  color: var(--red-bright);
+}
+
+.ig-arrow.is-prev {
+  left: clamp(6px, calc(50% - 330px), 40vw);
+}
+
+.ig-arrow.is-next {
+  right: clamp(6px, calc(50% - 330px), 40vw);
+}
+
+.ig-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-top: 16px;
+}
+
+.ig-caption {
+  color: var(--ink-2);
+  font-size: 14.5px;
+  max-width: 54ch;
+}
+
+.ig-foot-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.ig-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.ig-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line-2);
+  transition: background 0.2s ease;
+}
+
+.ig-dot.is-on {
+  background: var(--red);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ig-card {
+    transition: none;
+  }
+}
+
+/* Compact poster line, since the cover flow now carries the hero. */
+.hero-title-compact {
+  font-size: clamp(30px, 3.6vw, 46px);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  margin: 6px 0 18px;
+}
+
+@media (max-width: 760px) {
+  .ig-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .ig-stage {
+    height: 420px;
+  }
+
+  .ig-card {
+    width: 62vw;
+    --swing: 30%;
+  }
+
+  .ig-arrow {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .ig-arrow.is-prev {
+    left: 2px;
+  }
+
+  .ig-arrow.is-next {
+    right: 2px;
+  }
+
+  .ig-foot {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .ig-foot-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

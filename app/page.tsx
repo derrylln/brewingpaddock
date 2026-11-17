@@ -1,18 +1,21 @@
 import Link from "next/link";
 import Countdown from "@/components/Countdown";
 import HeroTrace from "@/components/HeroTrace";
+import InstagramCoverflow from "@/components/InstagramCoverflow";
 import ModulesGrid from "@/components/ModulesGrid";
 import NewsFeed from "@/components/NewsFeed";
 import SectionHead from "@/components/SectionHead";
 import StandingsTable from "@/components/StandingsTable";
 import { daysUntil, raceDay } from "@/lib/format";
 import { getSeasonOverview } from "@/lib/f1";
+import { getInstagramPosts, instagramHandle, instagramUrl } from "@/lib/instagram";
 import { teamColour, teamName } from "@/lib/teams";
 
 export const revalidate = 300;
 
 export default async function HomePage() {
   const overview = await getSeasonOverview();
+  const igPosts = await getInstagramPosts();
   const { standings, constructors, nextRace, lastRace, lastPodium, schedule, season } = overview;
   const leader = standings[0];
   const rival = standings[1];
@@ -31,12 +34,8 @@ export default async function HomePage() {
               <span className="slash">///</span> The paddock desk · {season} season · round{" "}
               {overview.completedRounds} of {schedule.length}
             </p>
-            <h1 className="hero-title">
-              F1,
-              <br />
-              <em>brewed</em>
-              <br />
-              strong.
+            <h1 className="hero-title hero-title-compact">
+              F1, <em>brewed</em> strong.
             </h1>
             <p className="hero-deck">
               Seven news desks, one live timing feed and a pit wall&apos;s worth of data — aggregated,
@@ -78,6 +77,8 @@ export default async function HomePage() {
             )}
           </aside>
         </div>
+
+        <InstagramCoverflow posts={igPosts} handle={instagramHandle} url={instagramUrl} />
 
         <div className="shell">
           <div className="hero-stats">
