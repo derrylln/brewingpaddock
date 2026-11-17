@@ -3705,3 +3705,119 @@ select.input {
     radial-gradient(ellipse 50% 60% at 92% 100%, rgba(31, 79, 184, 0.05), transparent 70%),
     var(--bg);
 }
+
+/* ── Curvature ───────────────────────────────────────────────────────────────
+   Nothing here is a hard 90° box. Radii scale with the surface: pills for
+   controls, 16–20px for cards and boards, 28px for the big bands. Full-bleed
+   page bands (header, hero, sections, footer) stay square so the page edge
+   remains the page edge. */
+:root {
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+}
+
+/* Controls read as pills. */
+.btn,
+.chip,
+.source-tag,
+.source-badge,
+.badge,
+.tag,
+.risk-pill,
+.compound-btn,
+.sc-toggle,
+.legend-row,
+.backtest-chip,
+.nav-link,
+.header-season,
+.theme-toggle,
+.live-pill,
+.thumb-tag {
+  border-radius: var(--r-pill);
+}
+
+/* Inputs and small tiles. */
+.input,
+.hero-trace-caption,
+.section-index,
+.cat-mark,
+.aside-stamp,
+.debrief-stat {
+  border-radius: var(--r-sm);
+}
+
+/* Boards, cards and panels. */
+.race-card,
+.module-card,
+.panel,
+.chart-shell,
+.news-card,
+.champ-banner,
+.driver-card,
+.podium-card,
+.call-card,
+.msg-body,
+.pipeline-step,
+.debrief-stats,
+.news-skeleton,
+.chart-skeleton,
+.debrief-teaser,
+.method-panel,
+.msg-table-wrap,
+.call-metrics,
+.stint-timeline,
+.method-list,
+.news-thumb,
+.podium-slot {
+  border-radius: var(--r-lg);
+}
+
+/* Accent cards with a coloured edge get a touch more curve. */
+.cta-band,
+.hero-stats {
+  border-radius: var(--r-xl);
+}
+
+.disclaimer,
+.debrief-ai {
+  border-radius: var(--r-md);
+}
+
+/* Clip children so headers, images and table rows follow the curve. */
+.panel,
+.chart-shell,
+.news-thumb,
+.cta-band,
+.champ-banner,
+.hero-stats,
+.call-metrics,
+.stint-timeline,
+.msg-table-wrap,
+.debrief-teaser,
+.method-panel,
+.race-card,
+.data-table {
+  overflow: hidden;
+}
+
+/* News cards carry their own surface: the old 1px top rule vanished into the
+   curve once corners rounded, which left them floating with no edge. */
+.news-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding-top: 0;
+  overflow: hidden;
+}
+
+.news-card .news-body {
+  padding: 14px 16px 18px;
+}
+
+.news-card .news-thumb {
+  border: 0;
+  border-radius: 0;
+}
