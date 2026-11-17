@@ -74,30 +74,53 @@ export default function InstagramCoverflow({ posts, handle, url, variant = "sect
             const depth = Math.abs(pos);
             const hidden = depth > 2;
 
+            const style = {
+              // --pos drives the horizontal swing in CSS so a media query can
+              // tighten it on phones without recomputing in JS.
+              ["--pos" as string]: pos,
+              transform: `translate(-50%, -50%) translateX(calc(var(--pos) * var(--swing))) translateZ(${-depth * 110}px) rotateY(${pos * -28}deg) scale(${1 - Math.min(depth, 3) * 0.085})`,
+              zIndex: 20 - depth,
+              opacity: hidden ? 0 : 1,
+              pointerEvents: hidden ? ("none" as const) : ("auto" as const),
+            };
+
+            const frame = (
+              <span className="ig-frame">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={post.image} alt="" loading={depth < 2 ? "eager" : "lazy"} decoding="async" />
+                <span className="ig-badge mono">{post.kind === "reel" ? "Reel" : "Post"}</span>
+              </span>
+            );
+
+            // The front card is the post itself; the ones behind bring themselves forward.
+            if (pos === 0) {
+              return (
+                <a
+                  key={post.id}
+                  className="ig-card is-active"
+                  href={post.permalink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Open on Instagram: ${post.caption}`}
+                  style={style}
+                >
+                  {frame}
+                </a>
+              );
+            }
+
             return (
               <button
                 key={post.id}
                 type="button"
-                className={`ig-card${pos === 0 ? " is-active" : ""}`}
-                aria-label={pos === 0 ? `Open post: ${post.caption}` : `Bring post ${i + 1} to the front`}
+                className="ig-card"
+                aria-label={`Bring post ${i + 1} to the front`}
                 aria-hidden={hidden}
                 tabIndex={hidden ? -1 : 0}
-                onClick={() => (pos === 0 ? undefined : setActive(i))}
-                style={{
-                  // --pos drives the horizontal swing in CSS so a media query can
-                  // tighten it on phones without recomputing in JS.
-                  ["--pos" as string]: pos,
-                  transform: `translate(-50%, -50%) translateX(calc(var(--pos) * var(--swing))) translateZ(${-depth * 110}px) rotateY(${pos * -28}deg) scale(${1 - Math.min(depth, 3) * 0.085})`,
-                  zIndex: 20 - depth,
-                  opacity: hidden ? 0 : 1,
-                  pointerEvents: hidden ? "none" : "auto",
-                }}
+                onClick={() => setActive(i)}
+                style={style}
               >
-                <span className="ig-frame">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={post.image} alt="" loading={depth < 2 ? "eager" : "lazy"} decoding="async" />
-                  <span className="ig-badge mono">{post.kind === "reel" ? "Reel" : "Post"}</span>
-                </span>
+                {frame}
               </button>
             );
           })}
@@ -120,12 +143,12 @@ export default function InstagramCoverflow({ posts, handle, url, variant = "sect
             ))}
           </div>
           <a
-            className="btn btn-ghost ig-open"
+            className="text-link mono ig-open"
             href={current.permalink}
             target="_blank"
             rel="noopener noreferrer"
           >
-            Open on Instagram ↗
+            Open ↗
           </a>
         </div>
       </div>

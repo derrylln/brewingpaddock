@@ -41,10 +41,6 @@ export default async function HomePage() {
               url={instagramUrl}
               variant="hero"
             />
-            <p className="hero-deck">
-              Seven news desks, one live timing feed and a pit wall&apos;s worth of data — aggregated,
-              modelled and poured fresh every race weekend. No filler, no farmed headlines.
-            </p>
             <div className="hero-actions">
               <Link className="btn btn-primary" href="/news">
                 Read the wire
