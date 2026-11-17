@@ -1,5 +1,12 @@
 [
   {
+    "id": "post-1",
+    "image": "/instagram/1.jpg",
+    "caption": "Brewing Paddock · Latest from the desk.",
+    "permalink": "https://www.instagram.com/brewingpaddock/",
+    "kind": "post"
+  },
+  {
     "id": "demo-1",
     "image": "/instagram/post-1.png",
     "caption": "Lights out in Vegas. The paddock never sleeps.",
@@ -38,13 +45,6 @@
     "id": "demo-6",
     "image": "/instagram/post-6.png",
     "caption": "Night race. Neon on carbon.",
-    "permalink": "https://www.instagram.com/brewingpaddock/",
-    "kind": "post"
-  },
-  {
-    "id": "demo-7",
-    "image": "/instagram/post-7.png",
-    "caption": "The championship picture, in one frame.",
     "permalink": "https://www.instagram.com/brewingpaddock/",
     "kind": "post"
   }
