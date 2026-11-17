@@ -137,11 +137,11 @@ export default function Predictor() {
             <span className="mono">factor weights</span>
           </div>
           <div className="factor-legend mono">
-            <span>Qualifying 30%</span>
-            <span>Form 26%</span>
-            <span>Championship 20%</span>
+            <span>Qualifying 28%</span>
+            <span>Form & Momentum 36%</span>
+            <span>Team pace 14%</span>
             <span>Consistency 12%</span>
-            <span>Team 12%</span>
+            <span>Championship 10%</span>
           </div>
           {top.slice(0, 5).map((row) => (
             <div className="factor-row" key={row.code}>

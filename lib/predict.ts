@@ -69,7 +69,8 @@ function stdev(values: number[]): number {
   return Math.sqrt(variance);
 }
 
-const WEIGHTS = { quali: 0.3, form: 0.26, champ: 0.2, consistency: 0.12, team: 0.12 };
+const WEIGHTS = { quali: 0.28, form: 0.36, team: 0.14, consistency: 0.12, champ: 0.1 };
+const W_RECENCY = [0.1, 0.15, 0.2, 0.25, 0.3];
 
 /** Build a score in 0..1 for every driver, then simulate the race 4,000 times. */
 export async function buildPrediction(): Promise<Prediction> {
@@ -85,6 +86,17 @@ export async function buildPrediction(): Promise<Prediction> {
   const standings = overview.standings;
   const leaderTeamPoints = Math.max(1, constructors[0]?.points ?? 1);
   const teamPoints = new Map(constructors.map((c) => [c.constructor.constructorId, c.points]));
+
+  // Rolling constructor pace over the last 5 races to reward in-season development
+  const teamRecent = new Map<string, number>();
+  const recentRounds = seasonResults.slice(-5);
+  for (const round of recentRounds) {
+    for (const r of round.results) {
+      const cId = r.Constructor.constructorId;
+      teamRecent.set(cId, (teamRecent.get(cId) ?? 0) + (Number(r.points) || 0));
+    }
+  }
+  const maxRecentTeam = Math.max(1, ...teamRecent.values());
 
   const lastQuali = new Map<string, number>();
   for (const q of quali) {
@@ -111,26 +123,51 @@ export async function buildPrediction(): Promise<Prediction> {
     const record = form.get(driver.driverId);
     const last5 = record ? record.positions.slice(-5) : [10];
     const points5 = record ? record.points.slice(-5) : [0];
-    const avgPoints = points5.reduce((a, b) => a + b, 0) / Math.max(1, points5.length);
-    const avgFinish = last5.reduce((a, b) => a + b, 0) / Math.max(1, last5.length);
     const dnfRate = record && record.positions.length > 0 ? record.dnf / record.positions.length : 0.08;
+
+    // Recency-weighted points and finishes: recent rounds matter much more than race -5
+    let weightedPoints = 0;
+    let weightedFinish = 0;
+    let wSum = 0;
+    points5.forEach((pt, i) => {
+      const w = W_RECENCY[W_RECENCY.length - points5.length + i] ?? 0.2;
+      weightedPoints += pt * w;
+      weightedFinish += last5[i] * w;
+      wSum += w;
+    });
+    weightedPoints /= wSum;
+    weightedFinish /= wSum;
+
+    const formScore = Math.min(1, weightedPoints / 25);
+    const finishScore = Math.min(1, Math.max(0, (21 - weightedFinish) / 20));
+
+    // Momentum / trajectory: are the most recent 2 rounds outperforming earlier rounds?
+    const pRecent =
+      points5.slice(-2).reduce((a, b) => a + b, 0) / Math.max(1, points5.slice(-2).length);
+    const pEarlier =
+      points5.slice(0, -2).reduce((a, b) => a + b, 0) / Math.max(1, points5.slice(0, -2).length);
+    const momentum = Math.min(1, Math.max(0, 0.5 + (pRecent - pEarlier) / 25));
+
+    const fullForm = formScore * 0.55 + finishScore * 0.3 + momentum * 0.15;
 
     const qualiLap = lastQuali.get(driver.driverId);
     const gap = qualiLap ? Math.max(0, qualiLap - bestQuali) : 1.4;
+    const qualiScore = Math.exp(-gap / 1.1);
 
     const champ = 1 - (entry.position - 1) / Math.max(1, standings.length - 1);
-    const formScore = Math.min(1, avgPoints / 25);
-    const qualiScore = Math.exp(-gap / 1.1);
     const consistency = Math.exp(-stdev(last5) / 4.5);
-    const teamStrength = Math.min(1, (teamPoints.get(entry.constructor.constructorId) ?? 0) / leaderTeamPoints);
-    const finishScore = Math.min(1, Math.max(0, (21 - avgFinish) / 20));
+
+    // Blended team strength: 75% recent pace (upgrades) + 25% full-season baseline
+    const recentTeamStrength = (teamRecent.get(entry.constructor.constructorId) ?? 0) / maxRecentTeam;
+    const seasonTeamStrength = (teamPoints.get(entry.constructor.constructorId) ?? 0) / leaderTeamPoints;
+    const teamStrength = Math.min(1, recentTeamStrength * 0.75 + seasonTeamStrength * 0.25);
 
     const score =
       WEIGHTS.quali * qualiScore +
-      WEIGHTS.form * (formScore * 0.6 + finishScore * 0.4) +
-      WEIGHTS.champ * champ +
+      WEIGHTS.form * fullForm +
+      WEIGHTS.team * teamStrength +
       WEIGHTS.consistency * consistency +
-      WEIGHTS.team * teamStrength;
+      WEIGHTS.champ * champ;
 
     return {
       code: driver.code ?? driver.familyName.slice(0, 3).toUpperCase(),
@@ -144,10 +181,10 @@ export async function buildPrediction(): Promise<Prediction> {
       dnfRisk: Math.min(0.28, 0.03 + dnfRate * 0.45),
       factors: [
         { key: "quali", label: "Qualifying pace", value: qualiScore },
-        { key: "form", label: "Recent form", value: formScore * 0.6 + finishScore * 0.4 },
-        { key: "champ", label: "Championship", value: champ },
+        { key: "form", label: "Form & momentum", value: fullForm },
+        { key: "team", label: "Team pace", value: teamStrength },
         { key: "consistency", label: "Consistency", value: consistency },
-        { key: "team", label: "Team strength", value: teamStrength },
+        { key: "champ", label: "Championship", value: champ },
       ],
     };
   });
@@ -223,7 +260,7 @@ export async function buildPrediction(): Promise<Prediction> {
     dataPoints,
     method: [
       `Scored ${rows.length} drivers across five weighted factors.`,
-      `Qualifying pace and recent form carry ${Math.round((WEIGHTS.quali + WEIGHTS.form) * 100)}% of the model.`,
+      `Qualifying pace and recency-weighted form carry ${Math.round((WEIGHTS.quali + WEIGHTS.form) * 100)}% of the model.`,
       `Simulated ${sims.toLocaleString("en-GB")} seeded races with Gumbel noise and per-driver DNF risk.`,
       "No finishing position is ever guaranteed — probabilities, not predictions of fact.",
     ],
