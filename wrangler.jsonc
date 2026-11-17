@@ -23,7 +23,7 @@
   "kv_namespaces": [
     {
       "binding": "NEXT_INC_CACHE_KV",
-      "id": "00000000000000000000000000000000"
+      "id": "849cb6cdbe6a45f3b1b7ef9be93f3a67"
     }
   ],
   // OpenNext's revalidation queue and tag cache are Durable Objects. These are
