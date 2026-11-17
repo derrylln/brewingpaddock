@@ -256,8 +256,10 @@ button {
 
 .brand-mark {
   display: block;
-  width: 27px;
-  height: 27px;
+  width: 34px;
+  height: 34px;
+  /* contain, so a wider original letterboxes instead of squashing */
+  object-fit: contain;
   flex-shrink: 0;
 }
 

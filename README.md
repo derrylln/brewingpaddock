@@ -14,6 +14,15 @@ npm run typecheck
 Data sources: Jolpica (standings, results, calendar), OpenF1 (telemetry), seven RSS news desks.
 A bundled snapshot in `data/snapshot.json` covers the season when Jolpica rate-limits the host.
 
+## Logo
+
+The mark in the header is a file, not code: `public/brand/logo.png` (512px or
+larger, square, transparent background). The file in the repo is a redraw from
+the poster artwork, so replace it with the original and the site picks it up —
+no code changes. For the favicon, do the same: add `app/icon.png` and delete
+`app/icon.svg`. Colour and size come from `.brand-mark` in `app/globals.css`
+(27px in the header).
+
 ## Theme and type
 
 The light/dark switch in the header writes `bp-theme` to localStorage and sets
