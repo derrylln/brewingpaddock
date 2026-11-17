@@ -7,44 +7,65 @@
     "kind": "post"
   },
   {
-    "id": "demo-1",
-    "image": "/instagram/post-1.png",
-    "caption": "Lights out in Vegas. The paddock never sleeps.",
-    "permalink": "https://www.instagram.com/brewingpaddock/",
-    "kind": "post"
-  },
-  {
-    "id": "demo-2",
-    "image": "/instagram/post-2.png",
+    "id": "post-2",
+    "image": "/instagram/2.jpg",
     "caption": "Three races left. Everything still to play for.",
     "permalink": "https://www.instagram.com/brewingpaddock/",
     "kind": "post"
   },
   {
-    "id": "demo-3",
-    "image": "/instagram/post-3.png",
+    "id": "post-3",
+    "image": "/instagram/3.jpg",
     "caption": "Sector two, flat out. The data never lies.",
     "permalink": "https://www.instagram.com/brewingpaddock/",
     "kind": "post"
   },
   {
-    "id": "demo-4",
-    "image": "/instagram/post-4.png",
+    "id": "post-4",
+    "image": "/instagram/4.jpg",
     "caption": "Brewed strong. Poured red.",
     "permalink": "https://www.instagram.com/brewingpaddock/",
     "kind": "post"
   },
   {
-    "id": "demo-5",
-    "image": "/instagram/post-5.png",
+    "id": "post-5",
+    "image": "/instagram/5.jpg",
     "caption": "Interlagos, distilled to one line.",
     "permalink": "https://www.instagram.com/brewingpaddock/",
-    "kind": "reel"
+    "kind": "post"
   },
   {
-    "id": "demo-6",
-    "image": "/instagram/post-6.png",
+    "id": "post-6",
+    "image": "/instagram/6.jpg",
     "caption": "Night race. Neon on carbon.",
+    "permalink": "https://www.instagram.com/brewingpaddock/",
+    "kind": "post"
+  },
+  {
+    "id": "post-7",
+    "image": "/instagram/7.jpg",
+    "caption": "The championship picture, in one frame.",
+    "permalink": "https://www.instagram.com/brewingpaddock/",
+    "kind": "post"
+  },
+  {
+    "id": "post-8",
+    "image": "/instagram/8.jpg",
+    "caption": "Behind the pit wall. Strategy in motion.",
+    "permalink": "https://www.instagram.com/brewingpaddock/",
+    "kind": "post"
+  },
+  {
+    "id": "post-9",
+    "image": "/instagram/9.jpg",
+    "caption": "Telemetry debrief: apex speed and throttle trace.",
+    "permalink": "https://www.instagram.com/brewingpaddock/",
+    "kind": "post"
+  },
+  {
+    "id": "post-10",
+    "image": "/instagram/10.jpg",
+    "caption": "Every lap, every rumour, one desk.",
     "permalink": "https://www.instagram.com/brewingpaddock/",
     "kind": "post"
   }
