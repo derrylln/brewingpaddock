@@ -400,7 +400,7 @@ button {
   position: relative;
   overflow: hidden;
   border-bottom: 1px solid var(--line);
-  padding: 58px 0 0;
+  padding: 58px 0 34px;
   background:
     radial-gradient(ellipse 60% 55% at 12% 8%, rgba(225, 6, 0, 0.14), transparent 70%),
     radial-gradient(ellipse 50% 60% at 92% 100%, rgba(76, 141, 255, 0.07), transparent 70%),
@@ -544,58 +544,6 @@ button {
   background: rgba(var(--bg-rgb), 0.72);
   padding: 4px 7px;
   border: 1px solid var(--line);
-}
-
-.hero-stats {
-  position: relative;
-  z-index: 3;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  border-top: 1px solid var(--line);
-  margin-top: 46px;
-  padding: 22px 0 26px;
-}
-
-.hero-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 0 26px;
-  border-left: 1px solid var(--line);
-}
-
-.hero-stat:first-child {
-  padding-left: 0;
-  border-left: 0;
-}
-
-.hero-stat-label {
-  color: var(--faint);
-  font-size: 9px;
-}
-
-.hero-stat-value {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 30px;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.hero-stat-value em {
-  font-style: normal;
-  font-size: 10px;
-  color: var(--dim);
-  letter-spacing: 0.14em;
-}
-
-.hero-stat-note {
-  color: var(--dim);
-  font-size: 12px;
-  line-height: 1.4;
 }
 
 /* race card + countdown */
@@ -3426,13 +3374,9 @@ select.input {
     order: 3;
     width: 100%;
     flex: none;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    row-gap: 4px;
     padding-bottom: 10px;
-    scrollbar-width: none;
-  }
-
-  .nav::-webkit-scrollbar {
-    display: none;
   }
 
   .header-right {
@@ -3448,16 +3392,6 @@ select.input {
   .news-row:first-child {
     border-top: 1px solid var(--line);
     padding-top: 15px;
-  }
-
-  .hero-stats {
-    grid-template-columns: 1fr 1fr;
-    gap: 20px 0;
-  }
-
-  .hero-stat:nth-child(3) {
-    padding-left: 0;
-    border-left: 0;
   }
 
   .champ-banner {
@@ -3811,8 +3745,7 @@ select.input {
 }
 
 /* Accent cards with a coloured edge get a touch more curve. */
-.cta-band,
-.hero-stats {
+.cta-band {
   border-radius: var(--r-xl);
 }
 
@@ -3827,7 +3760,6 @@ select.input {
 .news-thumb,
 .cta-band,
 .champ-banner,
-.hero-stats,
 .call-metrics,
 .stint-timeline,
 .msg-table-wrap,
@@ -4137,22 +4069,6 @@ select.input {
   right: 0;
 }
 
-.ig-hero .ig-foot {
-  padding-top: 12px;
-  flex-wrap: wrap;
-  gap: 10px 16px;
-}
-
-.ig-hero .ig-caption {
-  font-size: 13.5px;
-  max-width: 38ch;
-}
-
-.ig-hero .ig-open {
-  padding: 8px 14px;
-  font-size: 11px;
-}
-
 @media (max-width: 760px) {
   .ig-hero .ig-stage {
     height: 380px;
@@ -4184,32 +4100,6 @@ select.input {
   padding-bottom: 2px;
 }
 
-.ig-hero .ig-foot {
-  align-items: center;
-  padding-top: 10px;
-  flex-wrap: nowrap;
-  gap: 14px;
-}
-
-.ig-hero .ig-caption {
-  flex: 1;
-  min-width: 0;
-  font-size: 12.5px;
-  line-height: 1.35;
-  max-width: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ig-hero .ig-foot-right {
-  gap: 12px;
-}
-
-.ig-hero .ig-dots {
-  gap: 5px;
-}
-
 .ig-hero + .hero-actions {
   margin-top: 18px;
 }
@@ -4224,14 +4114,6 @@ select.input {
     --swing: 36%;
   }
 
-  .ig-hero .ig-foot {
-    flex-wrap: wrap;
-  }
-
-  .ig-hero .ig-caption {
-    flex-basis: 100%;
-    white-space: normal;
-  }
 }
 
 /* The front card is a link to the post; the ones behind are buttons. */
@@ -4243,12 +4125,6 @@ select.input {
 
 .ig-open {
   white-space: nowrap;
-}
-
-.ig-hero .ig-open {
-  padding: 0;
-  font-size: 9px;
-  letter-spacing: 0.16em;
 }
 
 /* Hero, full-bleed feed: one column, the cover flow owns the width, the race
@@ -4292,16 +4168,6 @@ select.input {
   --swing: 40%;
 }
 
-.ig-hero .ig-foot {
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.ig-hero .ig-caption {
-  flex: 0 1 auto;
-  max-width: 52ch;
-}
-
 /* The next-race countdown, reduced to one line. */
 .next-strip {
   display: flex;
@@ -4340,10 +4206,6 @@ select.input {
   font-variant-numeric: tabular-nums;
 }
 
-.hero-feed + .shell .hero-stats {
-  margin-top: 22px;
-}
-
 @media (max-width: 760px) {
   .ig-hero .ig-stage {
     height: 400px;
@@ -4352,14 +4214,6 @@ select.input {
   .ig-hero .ig-card {
     width: 72vw;
     --swing: 34%;
-  }
-
-  .ig-hero .ig-foot {
-    flex-wrap: wrap;
-  }
-
-  .ig-hero .ig-caption {
-    max-width: none;
   }
 
   .next-strip {

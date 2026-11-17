@@ -76,50 +76,6 @@ export default async function HomePage() {
             </div>
           )}
         </div>
-
-        <div className="shell">
-          <div className="hero-stats">
-            <div className="hero-stat">
-              <span className="mono hero-stat-label">Championship</span>
-              <span className="hero-stat-value">
-                {leader ? leader.driver.code : "—"}
-                <em className="mono">{leader?.points ?? 0}</em>
-              </span>
-              <span className="hero-stat-note">
-                {leader
-                  ? `+${gap} on ${rival?.driver.familyName ?? "the field"}${clinched ? " · title settled" : ""}`
-                  : "standings unavailable"}
-              </span>
-            </div>
-            <div className="hero-stat">
-              <span className="mono hero-stat-label">Last winner</span>
-              <span className="hero-stat-value">
-                {lastPodium[0]?.Driver.code ?? "—"}
-                <em className="mono">P1</em>
-              </span>
-              <span className="hero-stat-note">
-                {lastPodium[0]
-                  ? `${lastPodium[0].Driver.familyName} for ${teamName(lastPodium[0].Constructor.constructorId)}`
-                  : lastRace?.raceName ?? "no race data"}
-              </span>
-            </div>
-            <div className="hero-stat">
-              <span className="mono hero-stat-label">Rounds run</span>
-              <span className="hero-stat-value">
-                {overview.completedRounds}
-                <em className="mono">/{schedule.length}</em>
-              </span>
-              <span className="hero-stat-note">{remaining} race{remaining === 1 ? "" : "s"} left this season</span>
-            </div>
-            <div className="hero-stat">
-              <span className="mono hero-stat-label">Telemetry</span>
-              <span className="hero-stat-value">
-                3.7<em className="mono">Hz</em>
-              </span>
-              <span className="hero-stat-note">OpenF1 car data, fastest laps only</span>
-            </div>
-          </div>
-        </div>
       </section>
 
       <section className="section" id="wire">

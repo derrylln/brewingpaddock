@@ -132,24 +132,26 @@ export default function InstagramCoverflow({ posts, handle, url, variant = "sect
         </button>
       </div>
 
-      <div className="ig-foot">
-        <p className="ig-caption">{current.caption}</p>
-        <div className="ig-foot-right">
-          <div className="ig-dots" aria-hidden="true">
-            {posts.map((p, i) => (
-              <span key={p.id} className={`ig-dot${i === active ? " is-on" : ""}`} />
-            ))}
+      {compact ? null : (
+        <div className="ig-foot">
+          <p className="ig-caption">{current.caption}</p>
+          <div className="ig-foot-right">
+            <div className="ig-dots" aria-hidden="true">
+              {posts.map((p, i) => (
+                <span key={p.id} className={`ig-dot${i === active ? " is-on" : ""}`} />
+              ))}
+            </div>
+            <a
+              className="text-link mono ig-open"
+              href={current.permalink}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open ↗
+            </a>
           </div>
-          <a
-            className="text-link mono ig-open"
-            href={current.permalink}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Open ↗
-          </a>
         </div>
-      </div>
+      )}
     </section>
   );
 }
