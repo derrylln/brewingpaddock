@@ -94,36 +94,32 @@ export default function InstagramCoverflow({ posts, handle, url, variant = "sect
               </span>
             );
 
-            // The front card is the post itself; the ones behind bring themselves forward.
-            if (pos === 0) {
-              return (
-                <a
-                  key={post.id}
-                  className="ig-card is-active"
-                  href={post.permalink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Open on Instagram: ${post.caption}`}
-                  style={style}
-                >
-                  {frame}
-                </a>
-              );
-            }
-
+            // Every card is the same element on purpose: swapping an <a> for a
+            // <button> remounts the node and the transform transition is lost,
+            // which made the fan snap instead of glide. The front card is the
+            // only one that follows its link; the rest bring themselves forward.
             return (
-              <button
+              <a
                 key={post.id}
-                type="button"
-                className="ig-card"
-                aria-label={`Bring post ${i + 1} to the front`}
+                className={`ig-card${pos === 0 ? " is-active" : ""}`}
+                href={post.permalink}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={
+                  pos === 0 ? `Open on Instagram: ${post.caption}` : `Bring post ${i + 1} to the front`
+                }
                 aria-hidden={hidden}
                 tabIndex={hidden ? -1 : 0}
-                onClick={() => setActive(i)}
+                onClick={(e) => {
+                  if (pos !== 0) {
+                    e.preventDefault();
+                    setActive(i);
+                  }
+                }}
                 style={style}
               >
                 {frame}
-              </button>
+              </a>
             );
           })}
         </div>
