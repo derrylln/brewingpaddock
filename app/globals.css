@@ -16,11 +16,12 @@
   --green: #37d67a;
   --amber: #ffc300;
   --blue: #4c8dff;
-  /* Magistral is a licensed ParaType face: drop the woff2 files into public/fonts
-     and uncomment the @font-face block at the end of this file to use it. Until
-     then Archivo stands in, driven to its condensed width in heavy italic below
-     to match the poster voice. */
-  --font-display: "Magistral", "Archivo", "Helvetica Neue", Arial, sans-serif;
+  /* Magistral, licensed and supplied by the brand; woff2 subsets live in
+     public/fonts with their @font-face rules at the end of this file. Archivo is
+     the fallback, JetBrains Mono last so the ↗ / → glyphs (which Magistral does
+     not carry) come from one consistent face. */
+  --font-display: "Magistral", "Archivo", "Helvetica Neue", Arial, "JetBrains Mono", sans-serif;
+  --font-poster: "Magistral Cond", "Magistral", "Archivo", "Helvetica Neue", Arial, sans-serif;
   --font-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --shell: 1280px;
@@ -441,7 +442,7 @@ button {
 }
 
 .hero-title {
-  font-family: var(--font-display);
+  font-family: var(--font-poster);
   font-weight: 900;
   font-style: italic;
   font-size: clamp(62px, 10vw, 146px);
@@ -459,10 +460,10 @@ button {
 .debrief-headline,
 .section-title,
 .race-card-title {
-  font-stretch: 82%;
+  font-family: var(--font-poster);
   font-style: italic;
   font-weight: 900;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.015em;
 }
 
 /* Card-scale headings keep the family's narrow width but stand upright: 900
@@ -471,10 +472,10 @@ button {
 .champ-name,
 .telemetry-title,
 .predict-title {
-  font-stretch: 88%;
+  font-family: var(--font-poster);
   font-style: normal;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.018em;
 }
 
 .hero-title em {
@@ -893,7 +894,7 @@ select.input {
 }
 
 .section-title {
-  font-family: var(--font-display);
+  font-family: var(--font-poster);
   font-weight: 800;
   font-style: italic;
   text-transform: uppercase;
@@ -1442,7 +1443,7 @@ select.input {
 }
 
 .champ-name {
-  font-family: var(--font-display);
+  font-family: var(--font-poster);
   font-weight: 800;
   font-size: 26px;
   letter-spacing: -0.03em;
@@ -1595,7 +1596,7 @@ select.input {
 }
 
 .module-title {
-  font-family: var(--font-display);
+  font-family: var(--font-poster);
   font-weight: 800;
   font-style: normal;
   text-transform: uppercase;
@@ -1679,7 +1680,7 @@ select.input {
 }
 
 .page-title {
-  font-family: var(--font-display);
+  font-family: var(--font-poster);
   font-weight: 800;
   font-style: italic;
   text-transform: uppercase;
@@ -1744,7 +1745,7 @@ select.input {
 }
 
 .telemetry-title {
-  font-family: var(--font-display);
+  font-family: var(--font-poster);
   font-weight: 800;
   font-size: 30px;
   letter-spacing: -0.03em;
@@ -2940,7 +2941,7 @@ select.input {
 }
 
 .race-title {
-  font-family: var(--font-display);
+  font-family: var(--font-poster);
   font-weight: 800;
   font-style: italic;
   text-transform: uppercase;
@@ -3064,7 +3065,7 @@ select.input {
 }
 
 .debrief-headline {
-  font-family: var(--font-display);
+  font-family: var(--font-poster);
   font-weight: 900;
   font-style: italic;
   text-transform: uppercase;
@@ -3667,32 +3668,59 @@ select.input {
   vertical-align: middle;
 }
 
-/* Licensed face, drop-in. Add the woff2 files under public/fonts/ (for example
-   Magistral-Book.woff2, Magistral-Bold.woff2, Magistral-Book-Italic.woff2 as
-   licensed from ParaType) and uncomment this block. The display stack already
-   lists "Magistral" first, so the real face takes over with no other change.
+/* Magistral — licensed ParaType family, subset to Latin + punctuation, arrows
+   and currency, converted to woff2. Condensed cuts carry the poster voice; the
+   family ships no condensed italics, so the poster tier's slant is synthesised. */
 @font-face {
   font-family: "Magistral";
-  src: url("/fonts/Magistral-Book.woff2") format("woff2");
-  font-weight: 400 500;
+  src: url("/fonts/magistral-book.woff2") format("woff2");
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "Magistral";
-  src: url("/fonts/Magistral-Bold.woff2") format("woff2");
-  font-weight: 600 900;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Magistral";
-  src: url("/fonts/Magistral-Book-Italic.woff2") format("woff2");
-  font-weight: 400 500;
+  src: url("/fonts/magistral-book-italic.woff2") format("woff2");
+  font-weight: 400;
   font-style: italic;
   font-display: swap;
 }
-*/
+@font-face {
+  font-family: "Magistral";
+  src: url("/fonts/magistral-medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Magistral";
+  src: url("/fonts/magistral-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Magistral Cond";
+  src: url("/fonts/magistral-cond-book.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Magistral Cond";
+  src: url("/fonts/magistral-cond-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Magistral Cond";
+  src: url("/fonts/magistral-cond-extrabold.woff2") format("woff2");
+  font-weight: 800 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 
 @media (max-width: 640px) {
   .theme-label {

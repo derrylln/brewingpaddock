@@ -17,11 +17,10 @@ A bundled snapshot in `data/snapshot.json` covers the season when Jolpica rate-l
 ## Logo
 
 The mark in the header is a file, not code: `public/brand/logo.png` (512px or
-larger, square, transparent background). The file in the repo is a redraw from
-the poster artwork, so replace it with the original and the site picks it up —
-no code changes. For the favicon, do the same: add `app/icon.png` and delete
-`app/icon.svg`. Colour and size come from `.brand-mark` in `app/globals.css`
-(27px in the header).
+larger, square, transparent background) — the brand's own artwork, trimmed from
+the upload in the repo root and squared. The favicon is `app/icon.png`, generated
+from the same file. Swap either by replacing that file; colour and size come from
+`.brand-mark` in `app/globals.css` (34px in the header).
 
 ## Theme and type
 
@@ -33,17 +32,29 @@ in `app/globals.css` (`--bg`, `--ink`, `--red`, plus the `--wash-rgb` overlay
 channel), with the light palette under `:root[data-theme="light"]` — new surfaces
 should use those tokens rather than hard-coded hexes.
 
-Display type is **Magistral**, a licensed ParaType face, so the repo ships the
-free **Archivo** variable font in its place, driven to `font-stretch: 82%` in
-heavy italic to match the poster voice. Two tiers in `app/globals.css`: the
-poster treatment is limited to display-scale headings (`.hero-title`,
-`.page-title`, `.race-title`, `.debrief-headline`, `.section-title`,
-`.race-card-title`), while card-scale headings (`.module-title`, `.champ-name`,
-`.telemetry-title`, `.predict-title`) stay upright at 88% width — 900 italic at
-card size reads as shouting. The stack already lists `Magistral` first: buy the woff2
-files, drop them in `public/fonts/`, and uncomment the `@font-face` block at the
-end of `app/globals.css`. The "Brewed by Brewing Paddock" footer line is Times
-New Roman.
+Display type is **Magistral** (licensed ParaType family, supplied by the brand).
+`public/fonts/` holds Latin subsets converted to woff2 from the OTF originals in
+`fonnts.com-236668.zip`; regenerate with:
+
+```sh
+pip install fonttools brotli
+python3 -m fontTools.subset fonnts.com-Magistral_Cond_Extra_Bold.otf \
+  --flavor=woff2 --output-file=public/fonts/magistral-cond-extrabold.woff2 \
+  --unicodes="U+0020-00FF,U+2000-206F,U+20A0-20BF,U+2122,U+2190-21FF,U+2212"
+```
+
+Two tiers in `app/globals.css`: the poster treatment is limited to display-scale
+headings (`.hero-title`, `.page-title`, `.race-title`, `.debrief-headline`,
+`.section-title`, `.race-card-title`) and uses **Magistral Cond** Extra Bold — the
+family ships no condensed italic, so that slant is synthesised. Card-scale
+headings (`.module-title`, `.champ-name`, `.telemetry-title`, `.predict-title`)
+use Cond Extra Bold upright; 900 italic at card size reads as shouting. Body copy
+is Magistral Book, and **Archivo** is only a fallback.
+
+Magistral carries no arrow glyphs, so the stack ends in `JetBrains Mono` to keep
+↗ and → consistent. If the licensed files are ever replaced, drop the new woff2s
+into `public/fonts/` and keep the `@font-face` block at the end of `app/globals.css`
+in step. The "Brewed by Brewing Paddock" footer line is Times New Roman.
 
 ## AI
 
