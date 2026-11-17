@@ -13,8 +13,8 @@ export default function BrandMark({ className }: { className?: string }) {
       className={className}
       src="/brand/logo.png"
       alt=""
-      width={34}
-      height={34}
+      width={26}
+      height={26}
       aria-hidden="true"
       decoding="async"
     />
