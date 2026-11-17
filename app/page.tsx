@@ -34,9 +34,13 @@ export default async function HomePage() {
               <span className="slash">///</span> The paddock desk · {season} season · round{" "}
               {overview.completedRounds} of {schedule.length}
             </p>
-            <h1 className="hero-title hero-title-compact">
-              F1, <em>brewed</em> strong.
-            </h1>
+            <h1 className="sr-only">Brewing Paddock — F1, brewed strong</h1>
+            <InstagramCoverflow
+              posts={igPosts}
+              handle={instagramHandle}
+              url={instagramUrl}
+              variant="hero"
+            />
             <p className="hero-deck">
               Seven news desks, one live timing feed and a pit wall&apos;s worth of data — aggregated,
               modelled and poured fresh every race weekend. No filler, no farmed headlines.
@@ -77,8 +81,6 @@ export default async function HomePage() {
             )}
           </aside>
         </div>
-
-        <InstagramCoverflow posts={igPosts} handle={instagramHandle} url={instagramUrl} />
 
         <div className="shell">
           <div className="hero-stats">

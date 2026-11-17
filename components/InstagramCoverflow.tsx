@@ -3,14 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { IgPost } from "@/lib/instagram";
 
-type Props = { posts: IgPost[]; handle: string; url: string };
+type Props = {
+  posts: IgPost[];
+  handle: string;
+  url: string;
+  /** "hero" sits inside the homepage hero column; "section" is full width. */
+  variant?: "hero" | "section";
+};
 
 /**
  * The feed as a cover flow: one post square to the camera, the neighbours
  * rotated away behind it on each side. Click a side card, use the arrows, the
  * keyboard, or swipe on touch.
  */
-export default function InstagramCoverflow({ posts, handle, url }: Props) {
+export default function InstagramCoverflow({ posts, handle, url, variant = "section" }: Props) {
   const [active, setActive] = useState(0);
   const count = posts.length;
   const startX = useRef<number | null>(null);
@@ -31,13 +37,17 @@ export default function InstagramCoverflow({ posts, handle, url }: Props) {
 
   if (!count) return null;
   const current = posts[active];
+  const compact = variant === "hero";
 
   return (
-    <section className="ig" aria-label={`Latest from @${handle}`}>
-      <div className="shell ig-head">
+    <section
+      className={compact ? "ig ig-hero" : "ig"}
+      aria-label={`Latest from @${handle}`}
+    >
+      <div className={compact ? "ig-head ig-head-compact" : "ig-head"}>
         <div>
           <p className="mono kicker-red">The feed · @{handle}</p>
-          <h2 className="ig-title">Straight from the paddock</h2>
+          {compact ? null : <h2 className="ig-title">Straight from the paddock</h2>}
         </div>
         <a className="text-link mono ig-follow" href={url} target="_blank" rel="noopener noreferrer">
           Follow on Instagram ↗
@@ -101,7 +111,7 @@ export default function InstagramCoverflow({ posts, handle, url }: Props) {
         </button>
       </div>
 
-      <div className="shell ig-foot">
+      <div className="ig-foot">
         <p className="ig-caption">{current.caption}</p>
         <div className="ig-foot-right">
           <div className="ig-dots" aria-hidden="true">

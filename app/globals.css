@@ -4085,3 +4085,81 @@ select.input {
     justify-content: space-between;
   }
 }
+
+/* Visually hidden, still read by search engines and screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Hero variant: the cover flow sits in the column the poster stack used to own. */
+.ig-hero {
+  padding: 0;
+  margin-top: 14px;
+}
+
+.ig-hero .ig-head {
+  padding-bottom: 6px;
+}
+
+.ig-hero .ig-title {
+  display: none;
+}
+
+.ig-hero .ig-stage {
+  height: clamp(300px, 24vw, 372px);
+  perspective: 1200px;
+}
+
+.ig-hero .ig-card {
+  width: clamp(168px, 17.5vw, 264px);
+  --swing: 52%;
+}
+
+.ig-hero .ig-arrow {
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+}
+
+.ig-hero .ig-arrow.is-prev {
+  left: 0;
+}
+
+.ig-hero .ig-arrow.is-next {
+  right: 0;
+}
+
+.ig-hero .ig-foot {
+  padding-top: 12px;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.ig-hero .ig-caption {
+  font-size: 13.5px;
+  max-width: 38ch;
+}
+
+.ig-hero .ig-open {
+  padding: 8px 14px;
+  font-size: 11px;
+}
+
+@media (max-width: 760px) {
+  .ig-hero .ig-stage {
+    height: 380px;
+  }
+
+  .ig-hero .ig-card {
+    width: 58vw;
+    --swing: 34%;
+  }
+}
