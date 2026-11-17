@@ -98,22 +98,40 @@ export async function buildPrediction(): Promise<Prediction> {
   }
   const maxRecentTeam = Math.max(1, ...teamRecent.values());
 
-  const lastQuali = new Map<string, number>();
-  for (const q of quali) {
-    const lap = parseLap(q.Q3) ?? parseLap(q.Q2) ?? parseLap(q.Q1);
-    if (lap) lastQuali.set(q.Driver.driverId, lap);
-  }
-  const bestQuali = Math.min(...[...lastQuali.values(), Infinity]);
+  // Stage-relative session deltas so Q1 track evolution is never penalized against dry Q3 rubber
+  const bestQ3 = Math.min(...quali.map((q) => parseLap(q.Q3)).filter((v): v is number => v !== null));
+  const bestQ2 = Math.min(...quali.map((q) => parseLap(q.Q2)).filter((v): v is number => v !== null));
+  const bestQ1 = Math.min(...quali.map((q) => parseLap(q.Q1)).filter((v): v is number => v !== null));
 
-  const form = new Map<string, { positions: number[]; points: number[]; dnf: number }>();
+  const latestQualiMap = new Map<string, number>();
+  for (const q of quali) {
+    const pos = Number(q.position) || 20;
+    const posScore = Math.max(0, (22 - pos) / 21);
+    let delta = 1.4;
+    if (q.Q3) {
+      const l = parseLap(q.Q3);
+      if (l && Number.isFinite(bestQ3)) delta = l - bestQ3;
+    } else if (q.Q2) {
+      const l = parseLap(q.Q2);
+      if (l && Number.isFinite(bestQ2)) delta = 0.4 + (l - bestQ2);
+    } else if (q.Q1) {
+      const l = parseLap(q.Q1);
+      if (l && Number.isFinite(bestQ1)) delta = 0.8 + (l - bestQ1);
+    }
+    const deltaScore = Math.exp(-delta / 1.1);
+    latestQualiMap.set(q.Driver.driverId, deltaScore * 0.5 + posScore * 0.5);
+  }
+
+  const form = new Map<string, { positions: number[]; points: number[]; grids: number[]; dnf: number }>();
   for (const round of seasonResults.slice().sort((a, b) => a.round - b.round)) {
     for (const result of round.results) {
       const id = result.Driver.driverId;
-      if (!form.has(id)) form.set(id, { positions: [], points: [], dnf: 0 });
+      if (!form.has(id)) form.set(id, { positions: [], points: [], grids: [], dnf: 0 });
       const bucket = form.get(id)!;
       const finished = /^\d+$/.test(result.positionText);
       bucket.positions.push(finished ? Number(result.position) : 21);
       bucket.points.push(Number(result.points) || 0);
+      bucket.grids.push(Number(result.grid) || 20);
       if (!isFinisher(result.status)) bucket.dnf += 1;
     }
   }
@@ -123,20 +141,24 @@ export async function buildPrediction(): Promise<Prediction> {
     const record = form.get(driver.driverId);
     const last5 = record ? record.positions.slice(-5) : [10];
     const points5 = record ? record.points.slice(-5) : [0];
+    const grids5 = record ? record.grids.slice(-5) : [10];
     const dnfRate = record && record.positions.length > 0 ? record.dnf / record.positions.length : 0.08;
 
-    // Recency-weighted points and finishes: recent rounds matter much more than race -5
+    // Recency-weighted points, finishes and starting grids
     let weightedPoints = 0;
     let weightedFinish = 0;
+    let weightedGrid = 0;
     let wSum = 0;
     points5.forEach((pt, i) => {
       const w = W_RECENCY[W_RECENCY.length - points5.length + i] ?? 0.2;
       weightedPoints += pt * w;
       weightedFinish += last5[i] * w;
+      weightedGrid += grids5[i] * w;
       wSum += w;
     });
     weightedPoints /= wSum;
     weightedFinish /= wSum;
+    weightedGrid /= wSum;
 
     const formScore = Math.min(1, weightedPoints / 25);
     const finishScore = Math.min(1, Math.max(0, (21 - weightedFinish) / 20));
@@ -150,9 +172,10 @@ export async function buildPrediction(): Promise<Prediction> {
 
     const fullForm = formScore * 0.55 + finishScore * 0.3 + momentum * 0.15;
 
-    const qualiLap = lastQuali.get(driver.driverId);
-    const gap = qualiLap ? Math.max(0, qualiLap - bestQuali) : 1.4;
-    const qualiScore = Math.exp(-gap / 1.1);
+    // Qualifying pace: rolling grid average across last 5 races (60%) + latest session normalized (40%)
+    const rollingQuali = Math.min(1, Math.max(0, (21 - weightedGrid) / 20));
+    const latestQuali = latestQualiMap.get(driver.driverId) ?? rollingQuali;
+    const qualiScore = rollingQuali * 0.6 + latestQuali * 0.4;
 
     const champ = 1 - (entry.position - 1) / Math.max(1, standings.length - 1);
     const consistency = Math.exp(-stdev(last5) / 4.5);
