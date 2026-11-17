@@ -449,18 +449,30 @@ button {
   padding-bottom: 0.06em;
 }
 
-/* Poster voice: heavy condensed italic caps across every display heading. */
+/* Poster voice: display-scale headings only — the hero, page titles, race
+   titles, section heads and the countdown slate. Nothing else inherits it. */
 .hero-title,
+.page-title,
+.race-title,
+.debrief-headline,
 .section-title,
-.race-card-title,
-.module-title,
-.champ-name,
-h1,
-h2 {
+.race-card-title {
   font-stretch: 82%;
   font-style: italic;
   font-weight: 900;
   letter-spacing: -0.04em;
+}
+
+/* Card-scale headings keep the family's narrow width but stand upright: 900
+   italic at 25–34px inside a card shouts instead of reading. */
+.module-title,
+.champ-name,
+.telemetry-title,
+.predict-title {
+  font-stretch: 88%;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .hero-title em {
@@ -882,6 +894,7 @@ select.input {
   font-size: clamp(30px, 3.6vw, 46px);
   line-height: 0.92;
   letter-spacing: -0.045em;
+  padding-bottom: 0.06em;
 }
 
 .section-note {
@@ -1578,11 +1591,10 @@ select.input {
 .module-title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-style: italic;
+  font-style: normal;
   text-transform: uppercase;
   font-size: 25px;
-  line-height: 0.98;
-  letter-spacing: -0.04em;
+  line-height: 1.06;
   max-width: 260px;
 }
 
@@ -1628,10 +1640,11 @@ select.input {
   font-family: var(--font-display);
   font-weight: 800;
   font-style: italic;
+  font-stretch: 88%;
   text-transform: uppercase;
   font-size: clamp(24px, 3vw, 38px);
-  line-height: 1;
-  letter-spacing: -0.04em;
+  line-height: 1.02;
+  letter-spacing: -0.025em;
   margin: 10px 0 10px;
   max-width: 720px;
 }
@@ -1665,9 +1678,10 @@ select.input {
   font-style: italic;
   text-transform: uppercase;
   font-size: clamp(44px, 6.2vw, 82px);
-  line-height: 0.85;
+  line-height: 0.88;
   letter-spacing: -0.05em;
   margin: 12px 0 18px;
+  padding-bottom: 0.02em;
 }
 
 .page-title em {
@@ -2370,7 +2384,7 @@ select.input {
 .predict-title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-style: italic;
+  font-style: normal;
   text-transform: uppercase;
   font-size: 34px;
   letter-spacing: -0.04em;

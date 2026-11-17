@@ -26,8 +26,12 @@ should use those tokens rather than hard-coded hexes.
 
 Display type is **Magistral**, a licensed ParaType face, so the repo ships the
 free **Archivo** variable font in its place, driven to `font-stretch: 82%` in
-heavy italic to match the poster voice (regulation is in the `.hero-title` block
-of `app/globals.css`). The stack already lists `Magistral` first: buy the woff2
+heavy italic to match the poster voice. Two tiers in `app/globals.css`: the
+poster treatment is limited to display-scale headings (`.hero-title`,
+`.page-title`, `.race-title`, `.debrief-headline`, `.section-title`,
+`.race-card-title`), while card-scale headings (`.module-title`, `.champ-name`,
+`.telemetry-title`, `.predict-title`) stay upright at 88% width — 900 italic at
+card size reads as shouting. The stack already lists `Magistral` first: buy the woff2
 files, drop them in `public/fonts/`, and uncomment the `@font-face` block at the
 end of `app/globals.css`. The "Brewed by Brewing Paddock" footer line is Times
 New Roman.
