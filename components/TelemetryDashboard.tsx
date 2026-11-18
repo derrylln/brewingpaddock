@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import type { AiRead } from "@/lib/ai";
 import { fmtGap, fmtLap } from "@/lib/format";
 import type { DriverOption, SessionOption } from "@/lib/openf1";
 import { alignLaps, type TelemetryPayload } from "@/lib/telemetry";
@@ -56,9 +55,6 @@ export default function TelemetryDashboard() {
 
   const [hover, setHover] = useState<number | null>(null);
   const [showBrake, setShowBrake] = useState(true);
-  const [read, setRead] = useState<AiRead | null>(null);
-  const [reading, setReading] = useState(false);
-  const [readError, setReadError] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const signature = useRef<string>("");
 
@@ -158,7 +154,6 @@ export default function TelemetryDashboard() {
       .then((next) => {
         if (!alive) return;
         setPayload(next);
-        setRead(null);
       })
       .catch((err: Error) => alive && setError(err.message))
       .finally(() => alive && setLoading(false));
@@ -167,11 +162,6 @@ export default function TelemetryDashboard() {
       alive = false;
     };
   }, [selection]);
-
-  // A read describes one comparison, so drop it when the comparison moves.
-  useEffect(() => {
-    setRead(null);
-  }, [selection?.a, selection?.lapA, selection?.b, selection?.lapB, selection?.session]);
 
   const comparison = useMemo(() => {
     if (!payload) return null;
@@ -225,29 +215,6 @@ export default function TelemetryDashboard() {
   const retry = () => {
     signature.current = "";
     if (selection) setSelection({ ...selection });
-  };
-
-  const askEngineer = async () => {
-    if (!selection) return;
-    setReading(true);
-    setReadError(null);
-    try {
-      const res = await fetch("/api/ai/telemetry", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(selection),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? "The engineer is offline.");
-      }
-      const data = (await res.json()) as { read: AiRead };
-      setRead(data.read);
-    } catch (err) {
-      setReadError((err as Error).message);
-    } finally {
-      setReading(false);
-    }
   };
 
   if (error && !payload) {
@@ -592,23 +559,6 @@ export default function TelemetryDashboard() {
         <p className="mono telemetry-source">{payload.note}</p>
       </div>
 
-      <div className="panel ai-panel">
-        <div className="panel-head">
-          <h3>The engineer&apos;s read</h3>
-          <span className={`mono ai-tag${read?.source === "ai" ? " is-live" : ""}`}>
-            {read?.source === "ai" ? `AI · ${read.model}` : "model only"}
-          </span>
-        </div>
-        <p className="ai-read">
-          {read
-            ? read.text
-            : `Ask for the read on ${a.code} lap ${a.lapNumber} against ${b.code} lap ${b.lapNumber}: where the time went, what the throttle and braking traces say, and which part of the lap decides it if they race.`}
-        </p>
-        {readError ? <p className="ai-error mono">{readError}</p> : null}
-        <button type="button" className="btn btn-ghost ai-btn" onClick={askEngineer} disabled={reading}>
-          {reading ? "Reading the laps…" : read ? "Read it again" : "Ask the engineer"}
-        </button>
-      </div>
     </div>
   );
 }

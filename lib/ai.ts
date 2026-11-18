@@ -23,12 +23,20 @@
  * stays on the server and is never shipped to the browser.
  */
 
+import { rateLimit } from "@/lib/rate-limit";
+
 const DEFAULT_BASE = "https://generativelanguage.googleapis.com/v1beta/openai";
 // gemini-2.5-flash is deprecated and re-routes after 1 December 2026, so the
 // default is a current model, with a cheaper sibling as the fallback.
-const DEFAULT_MODEL = "gemini-3.5-flash";
-const FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-3.8-flash"];
-const TIMEOUT_MS = 20_000;
+const DEFAULT_MODEL = "gemini-3.5-flash-lite";
+// Ordered cheapest-capable first. `gemini-3.5-flash` is routinely 503 under load
+// and `gemini-3.8-flash` has answered with a gateway timeout, so the list is a
+// real failover path, not decoration.
+const FALLBACK_MODELS = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+/** Per-attempt cap, so a stalled model still leaves time for the next one. */
+const TIMEOUT_MS = 9_000;
+/** Statuses that mean "try again elsewhere", not "this key cannot do it". */
+const RETRYABLE = new Set([408, 429, 500, 502, 503, 504, 524]);
 /** Thought tokens are billed and counted against the cap; leave room for them. */
 const THINKING_HEADROOM = 600;
 
@@ -70,23 +78,20 @@ function isGemini(base: string): boolean {
 }
 
 /**
- * Per-isolate spend guard. The preview URL is public, so every generated word is
- * the owner's money: cap generation per worker instance instead of trusting the
- * visitor. Over budget, callers fall back to the computed read.
+ * Site-wide spend guard. The preview URL is public, so every generated word is
+ * the owner's money: this cap sits on top of the per-visitor throttle and does
+ * not trust any one visitor. Counted in the deployment's R2 bucket, not isolate
+ * memory — the isolate that serves the next request is usually a different one,
+ * so an in-memory counter would let the site overspend.
  */
-const LIMIT_PER_MINUTE = 20;
-const LIMIT_PER_HOUR = 240;
-const calls: number[] = [];
+const GLOBAL_PER_MINUTE = 12;
+const GLOBAL_PER_HOUR = 120;
 
-function withinBudget(now: number): boolean {
-  while (calls.length > 0 && now - calls[0] > 3_600_000) calls.shift();
-  if (calls.length >= LIMIT_PER_HOUR) return false;
-  let lastMinute = 0;
-  for (let i = calls.length - 1; i >= 0; i -= 1) {
-    if (now - calls[i] > 60_000) break;
-    lastMinute += 1;
-  }
-  return lastMinute < LIMIT_PER_MINUTE;
+async function withinBudget(): Promise<boolean> {
+  const minute = await rateLimit("ai-spend", "site", GLOBAL_PER_MINUTE, 60_000);
+  if (!minute.ok) return false;
+  const hour = await rateLimit("ai-spend-hour", "site", GLOBAL_PER_HOUR, 3_600_000);
+  return hour.ok;
 }
 
 type Attempt = { ok: boolean; status: number; text?: string; truncated?: boolean; detail?: string };
@@ -143,9 +148,7 @@ export async function aiText(request: {
   const key = apiKey();
   if (!key) return null;
 
-  const now = Date.now();
-  if (!withinBudget(now)) return null;
-  calls.push(now);
+  if (!(await withinBudget())) return null;
 
   const base = apiBase();
   const req: Request = {
@@ -186,12 +189,15 @@ export async function aiText(request: {
 
       console.error(`[ai] ${model} ${res.status} ${res.detail ?? "empty response"}`);
 
-      // Only an unknown model is worth another attempt; auth, quota and billing
-      // errors would fail identically on every model.
-      if (res.status !== 404) return null;
-    } catch (error) {
-      console.error(`[ai] ${model} request failed`, error);
+      // Overload, gateway timeouts and rate limits are model- or shard-specific,
+      // so the next model is worth a try. Auth, quota and billing errors are not:
+      // they would fail identically everywhere.
+      if (RETRYABLE.has(res.status) || res.status === 404) continue;
       return null;
+    } catch (error) {
+      // A timeout or connection drop is the same story: try the next model.
+      console.error(`[ai] ${model} request failed`, error);
+      continue;
     }
   }
 

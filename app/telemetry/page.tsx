@@ -4,7 +4,7 @@ import TelemetryDashboard from "@/components/TelemetryDashboard";
 export const metadata: Metadata = {
   title: "Telemetry compare",
   description:
-    "Pick any session, any two drivers and the exact lap you want: distance-aligned speed, throttle, brake and delta traces pulled live from OpenF1, with the engineer's read on where the time went.",
+    "Pick any session, any two drivers and the exact lap you want: distance-aligned speed, throttle, brake and delta traces pulled live from OpenF1.",
 };
 
 export default function TelemetryPage() {
@@ -21,8 +21,7 @@ export default function TelemetryPage() {
           <p className="page-deck">
             Choose the session, both drivers and the exact lap — race, qualifying or sprint — and the
             traces align corner by corner. Speed, throttle, brake and the running delta: the same
-            view a performance engineer stares at on a Sunday night, with the engineer&apos;s read on
-            top.
+            view a performance engineer stares at on a Sunday night.
           </p>
         </header>
         <TelemetryDashboard />

@@ -190,6 +190,8 @@ export const LIMITS = {
   telemetry: { limit: 30, windowMs: 60_000 },
   /** The forecast is pure compute and cached per round, so it is cheaper. */
   forecast: { limit: 20, windowMs: 60_000 },
-  /** Model calls cost money, so they are tighter. */
-  ai: { limit: 8, windowMs: 60_000 },
+  /** Model calls cost money, so they are tighter: per visitor, per minute... */
+  ai: { limit: 6, windowMs: 60_000 },
+  /** ...and per visitor, per hour, so one visitor cannot camp the desk. */
+  aiHourly: { limit: 30, windowMs: 3_600_000 },
 } as const;

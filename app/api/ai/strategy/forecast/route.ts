@@ -13,6 +13,8 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const gate = await guard(request, "ai", LIMITS.ai.limit, LIMITS.ai.windowMs);
   if (!gate.ok) return gate.response;
+  const hourly = await guard(request, "ai-hour", LIMITS.aiHourly.limit, LIMITS.aiHourly.windowMs);
+  if (!hourly.ok) return hourly.response;
 
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;

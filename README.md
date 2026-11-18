@@ -47,7 +47,6 @@ sprints), both drivers, and the exact lap for each. Everything comes from OpenF1
 | `GET /api/telemetry/options?session=KEY` | drivers in that session, with the laps each set |
 | `GET /api/telemetry?session=&a=&lapA=&b=&lapB=` | the two traces, distance-aligned |
 | `GET /api/telemetry` | the fastest two laps of the latest race (first paint) |
-| `POST /api/ai/telemetry` | the engineer's read on the chosen pair |
 
 OpenF1 throttles bursts, so the whole path is cached in two layers (`lib/cache.ts`):
 the isolate's memory and Next's data cache (`unstable_cache`, backed by the
@@ -58,8 +57,10 @@ not an upstream call. The browser is told the same with `Cache-Control`
 (`s-maxage` per route).
 
 Each visitor also gets a light throttle (`lib/rate-limit.ts`): 30 telemetry calls
-and 20 forecast calls a minute, 8 model calls a minute, answered with `429` and
-`Retry-After`. Visitors are identified by a first-party `bp-vid` cookie (the
+and 20 forecast calls a minute, 6 model calls a minute and 30 an hour, answered
+with `429` and `Retry-After`. On top of that, the site as a whole will only make
+12 model calls a minute and 120 an hour, so a public link cannot run up a bill
+even if the per-visitor buckets are dodged. Visitors are identified by a first-party `bp-vid` cookie (the
 platform does not forward the client IP, so IP is only a fallback for cookie-less
 requests), and the counters live in R2 rather than isolate memory — requests land
 on fresh isolates, so in-memory buckets never fill. This is a fairness valve, not
@@ -152,20 +153,25 @@ AI is off until a key is present. On Freebuff Sites, add these under **Sites →
 | Variable | Required | Default |
 | --- | --- | --- |
 | `GEMINI_API_KEY` | yes (aliases `GOOGLE_API_KEY`, `AI_API_KEY`) | — |
-| `AI_MODEL` | no | `gemini-3.5-flash` |
+| `AI_MODEL` | no | `gemini-3.5-flash-lite` |
 | `AI_API_BASE` | no | `https://generativelanguage.googleapis.com/v1beta/openai` |
 
 Requests use Gemini's OpenAI-compatible chat-completions endpoint with a Bearer key, so any other
 OpenAI-compatible endpoint works too (`https://api.openai.com/v1`, OpenRouter, Groq, …). `gemini-2.5-flash`
-is deprecated and re-routes after 1 December 2026 — `gemini-3.5-flash` and `gemini-3.5-flash-lite` are
-the current picks; an unknown model falls back to the next one instead of failing the page.
+is deprecated and re-routes after 1 December 2026. The default is `gemini-3.5-flash-lite`, because the
+bigger sibling spends time answering `503 high demand` (and `gemini-3.8-flash` returned a gateway
+timeout while this was written). The client fails over on 408/429/5xx and timeouts, and gives up
+immediately on auth or billing errors, which would fail the same way on every model. Each read is
+memoised in the shared data cache for fifteen minutes, so a repeat view costs no model call.
+
+Telemetry has no model call at all: the chart is the explanation, and the panel that asked the model
+to narrate it has been removed along with `POST /api/ai/telemetry`.
 
 Where it plugs in:
 
 - `POST /api/ask` — retrieval answers first, the model rephrases (grounded, same numbers).
 - `POST /api/ai/strategy` — recomputes the plan server-side, then writes the read.
 - `POST /api/ai/strategy/forecast` — rebuilds the race forecast from the calendar, then reads it.
-- `POST /api/ai/telemetry` — re-pulls the chosen pair, recomputes the summary, then explains it.
 - `GET /api/predict` — adds `read` to the forecast payload, cached ten minutes per instance.
 - `/race/[round]` — extra analysis on the latest round only, so the archive costs nothing.
 

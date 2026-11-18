@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { strategyRead } from "@/lib/ai-reads";
+import { LIMITS, guard, withGuardHeaders } from "@/lib/rate-limit";
 import {
   CIRCUITS,
   buildStrategies,
@@ -25,6 +26,11 @@ function num(value: unknown, min: number, max: number, fallback: number): number
  * can never describe numbers the simulator did not produce.
  */
 export async function POST(request: Request) {
+  const gate = await guard(request, "ai", LIMITS.ai.limit, LIMITS.ai.windowMs);
+  if (!gate.ok) return gate.response;
+  const hourly = await guard(request, "ai-hour", LIMITS.aiHourly.limit, LIMITS.aiHourly.windowMs);
+  if (!hourly.ok) return hourly.response;
+
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const circuit = (
@@ -48,7 +54,10 @@ export async function POST(request: Request) {
 
     const result = buildStrategies(input);
     const read = await strategyRead(input, result);
-    return NextResponse.json({ read, circuit: profile.name, lap: input.lap });
+    return withGuardHeaders(
+      NextResponse.json({ read, circuit: profile.name, lap: input.lap }),
+      gate,
+    );
   } catch (error) {
     console.error("[ai/strategy] failed", error);
     return NextResponse.json({ error: "The strategist could not read that scenario." }, { status: 502 });
