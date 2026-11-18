@@ -16,11 +16,54 @@ A bundled snapshot in `data/snapshot.json` covers the season when Jolpica rate-l
 
 ## Logo
 
-The mark in the header is a file, not code: `public/brand/logo.png` (512px or
-larger, square, transparent background) — the brand's own artwork, trimmed from
-the upload in the repo root and squared. The favicon is `app/icon.png`, generated
-from the same file. Swap either by replacing that file; colour and size come from
-`.brand-mark` in `app/globals.css` (34px in the header).
+The mark in the header is a file, not code: `public/brand/logo.png`. It is cut
+from `logooo.png` in the repo root — the brand's own artwork, 1080×1350 with the
+mark centred in transparent padding. Regenerate it (trim to the alpha bounding
+box, pad 10%, square, resize) with:
+
+```python
+from PIL import Image
+src = Image.open("logooo.png").convert("RGBA")
+ink = src.crop(src.getchannel("A").getbbox())
+side = max(ink.size); pad = int(side * 0.10)
+canvas = Image.new("RGBA", (side + pad * 2, side + pad * 2), (0, 0, 0, 0))
+canvas.paste(ink, ((canvas.width - ink.width) // 2, (canvas.height - ink.height) // 2), ink)
+canvas.resize((512, 512), Image.LANCZOS).save("public/brand/logo.png")
+```
+
+The favicon is `app/icon.png`, the same mark on the paper ground. Colour and size
+come from `.brand-mark` in `app/globals.css` (26px in the header). A previous
+crop shipped an almost-blank file — if the header ever looks empty, check the PNG
+alpha channel first, not the CSS.
+
+## Telemetry
+
+`/telemetry` is a picker, not a fixed view: session (recent races, qualifying and
+sprints), both drivers, and the exact lap for each. Everything comes from OpenF1:
+
+| Endpoint | Returns |
+| --- | --- |
+| `GET /api/telemetry/options` | sessions a visitor can choose |
+| `GET /api/telemetry/options?session=KEY` | drivers in that session, with the laps each set |
+| `GET /api/telemetry?session=&a=&lapA=&b=&lapB=` | the two traces, distance-aligned |
+| `GET /api/telemetry` | the fastest two laps of the latest race (first paint) |
+| `POST /api/ai/telemetry` | the engineer's read on the chosen pair |
+
+OpenF1 throttles bursts, so the server retries a throttled call once, caches laps
+and traces per session in the isolate, and keeps the bundled
+`data/telemetry-brazil-2026.json` pair for the first paint. A pair that genuinely
+has no car data returns an error instead of quietly showing different drivers —
+the dashboard keeps the previous chart and offers Retry.
+
+## Strategist
+
+`/strategy` opens with a pre-weekend forecast for the next race: every sensible
+plan shape (one stop, two stops, which compounds) is priced across five weighted
+scenarios — three track temperatures plus safety-car variants — and the winners
+are grouped into the percentages shown. `GET /api/strategy/forecast` builds it
+from the calendar; `POST /api/ai/strategy/forecast` adds the desk's read. The
+scenario lab below it is unchanged: set a lap, tyre, gaps and weather and price
+every window from there.
 
 ## Instagram feed
 
@@ -104,6 +147,8 @@ Where it plugs in:
 
 - `POST /api/ask` — retrieval answers first, the model rephrases (grounded, same numbers).
 - `POST /api/ai/strategy` — recomputes the plan server-side, then writes the read.
+- `POST /api/ai/strategy/forecast` — rebuilds the race forecast from the calendar, then reads it.
+- `POST /api/ai/telemetry` — re-pulls the chosen pair, recomputes the summary, then explains it.
 - `GET /api/predict` — adds `read` to the forecast payload, cached ten minutes per instance.
 - `/race/[round]` — extra analysis on the latest round only, so the archive costs nothing.
 

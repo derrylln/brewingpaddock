@@ -168,3 +168,81 @@ export function withDistance(raw: Array<Omit<TelemetryPoint, "t" | "d"> & { ts: 
   }
   return out;
 }
+
+export type LapSummary = {
+  code: string;
+  team: string;
+  lapNumber: number;
+  lapTime: number;
+  maxSpeed: number;
+  avgThrottle: number;
+  brakeZones: number;
+};
+
+export type ComparisonSummary = {
+  a: LapSummary;
+  b: LapSummary;
+  lapDelta: number;
+  sectorDelta: [number, number, number];
+  /** Where the slower driver loses the most, and where they claw it back. */
+  worstZone: { distance: number; value: number; code: string };
+  bestZone: { distance: number; value: number; code: string };
+  finalDelta: number;
+};
+
+function mean(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function brakeZones(brake: number[]): number {
+  let zones = 0;
+  for (let i = 1; i < brake.length; i += 1) {
+    if (brake[i] > 50 && brake[i - 1] <= 50) zones += 1;
+  }
+  return zones;
+}
+
+function summariseLap(lap: LapTrace, comparison: Comparison, side: "a" | "b"): LapSummary {
+  return {
+    code: lap.code,
+    team: lap.team,
+    lapNumber: lap.lapNumber,
+    lapTime: lap.lapTime,
+    maxSpeed: Math.round(Math.max(...comparison[side].v)),
+    avgThrottle: Math.round(mean(comparison[side].th)),
+    brakeZones: brakeZones(comparison[side].br),
+  };
+}
+
+/** The handful of facts the AI read is allowed to use, all computed here. */
+export function summariseComparison(a: LapTrace, b: LapTrace, comparison: Comparison): ComparisonSummary {
+  let worst = 0;
+  let best = 0;
+  comparison.delta.forEach((value, index) => {
+    if (value > comparison.delta[worst]) worst = index;
+    if (value < comparison.delta[best]) best = index;
+  });
+
+  return {
+    a: summariseLap(a, comparison, "a"),
+    b: summariseLap(b, comparison, "b"),
+    lapDelta: Number((a.lapTime - b.lapTime).toFixed(3)),
+    sectorDelta: comparison.sectorDelta.map((value) => Number(value.toFixed(3))) as [
+      number,
+      number,
+      number,
+    ],
+    worstZone: {
+      distance: Math.round(comparison.grid[worst]),
+      value: Number(comparison.delta[worst].toFixed(3)),
+      code: comparison.delta[worst] > 0 ? b.code : a.code,
+    },
+    bestZone: {
+      distance: Math.round(comparison.grid[best]),
+      value: Number(comparison.delta[best].toFixed(3)),
+      code: comparison.delta[best] > 0 ? b.code : a.code,
+    },
+    finalDelta: Number(comparison.delta[comparison.delta.length - 1].toFixed(3)),
+  };
+}

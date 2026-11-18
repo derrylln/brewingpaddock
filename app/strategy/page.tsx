@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import StrategyForecastPanel from "@/components/StrategyForecastPanel";
 import StrategyLab from "@/components/StrategyLab";
 
 export const metadata: Metadata = {
   title: "Race strategist",
   description:
-    "Set the scenario — circuit, lap, tyre age, gaps, temperature, weather or a safety car — and the stint model prices every pit window for you.",
+    "The most likely race plan for the next grand prix, priced across weather and safety-car scenarios, plus a stint model that prices every pit window from any lap you set.",
 };
 
 export default function StrategyPage() {
@@ -19,11 +20,13 @@ export default function StrategyPage() {
             <em>priced.</em>
           </h1>
           <p className="page-deck">
-            Give the model a scenario — a safety car, a dying hard tyre, a drying track — and it
-            simulates every sensible pit window to the flag. You get the recommended plan, the
-            alternatives and the assumptions behind them.
+            First the forecast: every sensible plan for the next race, priced across track
+            temperature and safety-car scenarios, so you can see what the grid is most likely to do
+            before a wheel turns. Then set your own scenario — a safety car, a dying hard tyre, a
+            drying track — and price every pit window to the flag.
           </p>
         </header>
+        <StrategyForecastPanel />
         <StrategyLab />
       </div>
     </div>

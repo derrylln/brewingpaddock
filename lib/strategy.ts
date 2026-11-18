@@ -340,3 +340,25 @@ export function buildStrategies(input: StrategyInput): StrategyResult {
 
   return { options, baseline: baseline.totalTime, call, transcript, undercut };
 }
+
+/** Price one explicit pit plan. Used by the race forecast, which enumerates
+ *  windows across the whole race rather than a 30-lap horizon from now. */
+export function pricePlan(
+  input: StrategyInput,
+  stops: Array<{ lap: number; compound: Compound }>,
+): StrategyOption {
+  const circuit = CIRCUITS[input.circuit];
+  const totalLaps = Math.min(input.totalLaps, circuit.laps);
+  return simulate({ ...input, totalLaps }, circuit, { stops });
+}
+
+/** Price a plan against an explicit circuit profile (used for circuits with no
+ *  bespoke entry in CIRCUITS, which the forecast builds from calendar metadata). */
+export function pricePlanOn(
+  profile: CircuitProfile,
+  input: StrategyInput,
+  stops: Array<{ lap: number; compound: Compound }>,
+): StrategyOption {
+  const totalLaps = Math.min(input.totalLaps, profile.laps);
+  return simulate({ ...input, totalLaps }, profile, { stops });
+}

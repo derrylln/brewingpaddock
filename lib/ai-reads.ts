@@ -2,6 +2,8 @@ import { aiEnabled, aiText, type AiCompletion, type AiRead } from "@/lib/ai";
 import type { AskAnswer } from "@/lib/knowledge";
 import type { Prediction } from "@/lib/predict";
 import type { StrategyInput, StrategyResult } from "@/lib/strategy";
+import type { StrategyForecast } from "@/lib/strategy-forecast";
+import type { ComparisonSummary, TelemetryPayload } from "@/lib/telemetry";
 
 /**
  * Grounded generation for each module.
@@ -173,4 +175,67 @@ You are answering a reader's question directly in the desk's voice. Never mentio
   return completion
     ? { text: completion.text, source: "ai", model: completion.model }
     : null;
+}
+
+/** Performance read on a two-lap telemetry comparison. */
+export async function telemetryRead(
+  payload: TelemetryPayload,
+  summary: ComparisonSummary,
+): Promise<AiRead> {
+  const faster = summary.lapDelta <= 0 ? summary.a : summary.b;
+  const slower = summary.lapDelta <= 0 ? summary.b : summary.a;
+  const gap = Math.abs(summary.lapDelta).toFixed(3);
+  const sectorWinner = summary.sectorDelta.map((value) => (value < 0 ? summary.a.code : summary.b.code));
+  const swept = sectorWinner.every((code) => code === sectorWinner[0]);
+  const sectorLine = swept
+    ? `${sectorWinner[0]} took all three sectors`
+    : `Sectors went ${sectorWinner.map((code, index) => `S${index + 1} ${code}`).join(", ")}`;
+
+  const fallback = `${faster.code}'s lap ${faster.lapNumber} was ${gap}s quicker than ${slower.code}'s lap ${slower.lapNumber}. ${sectorLine}. The biggest single swing came around ${summary.worstZone.distance}m, worth ${Math.abs(
+    summary.worstZone.value,
+  ).toFixed(3)}s. Top speed ${faster.maxSpeed} km/h against ${slower.maxSpeed} km/h.`;
+
+  const data = [
+    `Session: ${payload.session.year} ${payload.session.circuit}, ${payload.session.name}, ${payload.session.date}.`,
+    `${summary.a.code} (${summary.a.team}) lap ${summary.a.lapNumber}: ${summary.a.lapTime.toFixed(3)}s, max speed ${summary.a.maxSpeed} km/h, average throttle ${summary.a.avgThrottle}%, ${summary.a.brakeZones} braking events.`,
+    `${summary.b.code} (${summary.b.team}) lap ${summary.b.lapNumber}: ${summary.b.lapTime.toFixed(3)}s, max speed ${summary.b.maxSpeed} km/h, average throttle ${summary.b.avgThrottle}%, ${summary.b.brakeZones} braking events.`,
+    `Lap delta ${summary.lapDelta > 0 ? "+" : ""}${summary.lapDelta.toFixed(3)}s for ${summary.a.code} (negative means ${summary.a.code} faster).`,
+    `Sector deltas A minus B: S1 ${summary.sectorDelta[0] > 0 ? "+" : ""}${summary.sectorDelta[0].toFixed(3)}, S2 ${summary.sectorDelta[1] > 0 ? "+" : ""}${summary.sectorDelta[1].toFixed(3)}, S3 ${summary.sectorDelta[2] > 0 ? "+" : ""}${summary.sectorDelta[2].toFixed(3)}.`,
+    `Biggest gap in the lap at ${summary.worstZone.distance}m, worth ${summary.worstZone.value.toFixed(3)}s to ${summary.worstZone.code}.`,
+    `Elsewhere ${summary.bestZone.code} gains ${Math.abs(summary.bestZone.value).toFixed(3)}s around ${summary.bestZone.distance}m.`,
+    `Delta at the finish line: ${summary.finalDelta.toFixed(3)}s.`,
+  ].join("\n");
+
+  const completion = await aiText({
+    system: VOICE,
+    user: `DATA\n${data}\n\nTASK\nExplain where the lap time came from: which phase of the lap decided it, what the speed and throttle numbers say about the two drivers' approach, and the one corner or straight that is worth watching if they race each other. Use only these figures. Do not list every delta.`,
+    maxTokens: 250,
+  });
+
+  return asRead(completion, fallback);
+}
+
+/** Read on the pre-weekend race-plan forecast. */
+export async function forecastRead(forecast: StrategyForecast): Promise<AiRead> {
+  const favourite = forecast.plans[0];
+  const fallback = favourite ? forecast.call : "The forecast returned no plans.";
+
+  const data = [
+    `Race: ${forecast.race.name}, round ${forecast.race.round}, ${forecast.race.date}.`,
+    `Circuit model: ${forecast.race.circuitName}, ${forecast.race.laps} laps.`,
+    `Scenarios priced: ${forecast.scenarios}. Assumptions: ${forecast.assumptions.join(" ")}`,
+    "Ranked plans:",
+    ...forecast.plans.map(
+      (plan, index) =>
+        `${index + 1}. ${plan.label} — ${Math.round(plan.probability * 100)}% of scenarios, ${plan.stops} stop(s), pit laps ${plan.pitLaps.length ? plan.pitLaps.join("/") : "none"}, ${plan.risk} risk, ${plan.delta.toFixed(1)}s off the fastest projection.`,
+    ),
+  ].join("\n");
+
+  const completion = await aiText({
+    system: VOICE,
+    user: `DATA\n${data}\n\nTASK\nWrite the pre-weekend strategy read: what the most likely plan is and why the tyre model likes it, how much the alternatives give up, and the single race event most likely to flip the call. Do not restate the percentages table.`,
+    maxTokens: 250,
+  });
+
+  return asRead(completion, fallback);
 }
