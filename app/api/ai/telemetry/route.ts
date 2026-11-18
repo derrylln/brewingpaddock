@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { telemetryRead } from "@/lib/ai-reads";
 import { getSelectedTelemetry } from "@/lib/openf1";
+import { LIMITS, guard, withGuardHeaders } from "@/lib/rate-limit";
 import { alignLaps, summariseComparison } from "@/lib/telemetry";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,9 @@ function int(value: unknown): number | null {
  * it. The model never sees — or invents — a number we did not compute.
  */
 export async function POST(request: Request) {
+  const gate = await guard(request, "ai", LIMITS.ai.limit, LIMITS.ai.windowMs);
+  if (!gate.ok) return gate.response;
+
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const session = int(body.session);
@@ -32,7 +36,7 @@ export async function POST(request: Request) {
     const summary = summariseComparison(payload.drivers[0], payload.drivers[1], comparison);
     const read = await telemetryRead(payload, summary);
 
-    return NextResponse.json({ read, summary, source: payload.source });
+    return withGuardHeaders(NextResponse.json({ read, summary, source: payload.source }), gate);
   } catch (error) {
     console.error("[ai/telemetry] failed", error);
     return NextResponse.json({ error: "The engineer could not read those laps." }, { status: 502 });

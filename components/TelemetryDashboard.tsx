@@ -58,6 +58,7 @@ export default function TelemetryDashboard() {
   const [showBrake, setShowBrake] = useState(true);
   const [read, setRead] = useState<AiRead | null>(null);
   const [reading, setReading] = useState(false);
+  const [readError, setReadError] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const signature = useRef<string>("");
 
@@ -229,17 +230,21 @@ export default function TelemetryDashboard() {
   const askEngineer = async () => {
     if (!selection) return;
     setReading(true);
+    setReadError(null);
     try {
       const res = await fetch("/api/ai/telemetry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(selection),
       });
-      if (!res.ok) throw new Error("offline");
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? "The engineer is offline.");
+      }
       const data = (await res.json()) as { read: AiRead };
       setRead(data.read);
-    } catch {
-      setRead(null);
+    } catch (err) {
+      setReadError((err as Error).message);
     } finally {
       setReading(false);
     }
@@ -599,6 +604,7 @@ export default function TelemetryDashboard() {
             ? read.text
             : `Ask for the read on ${a.code} lap ${a.lapNumber} against ${b.code} lap ${b.lapNumber}: where the time went, what the throttle and braking traces say, and which part of the lap decides it if they race.`}
         </p>
+        {readError ? <p className="ai-error mono">{readError}</p> : null}
         <button type="button" className="btn btn-ghost ai-btn" onClick={askEngineer} disabled={reading}>
           {reading ? "Reading the laps…" : read ? "Read it again" : "Ask the engineer"}
         </button>

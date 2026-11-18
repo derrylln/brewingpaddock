@@ -49,11 +49,28 @@ sprints), both drivers, and the exact lap for each. Everything comes from OpenF1
 | `GET /api/telemetry` | the fastest two laps of the latest race (first paint) |
 | `POST /api/ai/telemetry` | the engineer's read on the chosen pair |
 
-OpenF1 throttles bursts, so the server retries a throttled call once, caches laps
-and traces per session in the isolate, and keeps the bundled
-`data/telemetry-brazil-2026.json` pair for the first paint. A pair that genuinely
-has no car data returns an error instead of quietly showing different drivers —
-the dashboard keeps the previous chart and offers Retry.
+OpenF1 throttles bursts, so the whole path is cached in two layers (`lib/cache.ts`):
+the isolate's memory and Next's data cache (`unstable_cache`, backed by the
+deployment's R2 incremental cache), which survives isolate churn. Sessions live
+15 minutes, lap and driver lists 30 minutes, a single lap's car trace an hour,
+and a chosen pair five minutes — so switching sessions is normally a cache hit,
+not an upstream call. The browser is told the same with `Cache-Control`
+(`s-maxage` per route).
+
+Each visitor also gets a light throttle (`lib/rate-limit.ts`): 30 telemetry calls
+and 20 forecast calls a minute, 8 model calls a minute, answered with `429` and
+`Retry-After`. Visitors are identified by a first-party `bp-vid` cookie (the
+platform does not forward the client IP, so IP is only a fallback for cookie-less
+requests), and the counters live in R2 rather than isolate memory — requests land
+on fresh isolates, so in-memory buckets never fill. This is a fairness valve, not
+security: it stops one person clicking through sessions from spending the OpenF1
+allowance the whole site shares.
+
+When upstream still fails, a stale copy (up to 24 hours) is served rather than an
+error. A pair that genuinely has no car data returns an error instead of quietly
+showing different drivers — the dashboard keeps the previous chart and offers
+Retry, and the first paint can always fall back to the bundled
+`data/telemetry-brazil-2026.json` pair.
 
 ## Strategist
 
@@ -164,7 +181,9 @@ builds and deploys. No Cloudflare token and no GitHub Actions secret lives in th
 1. Create the ISR cache: **Storage & databases → Workers KV → Create instance**, named
    `brewing-paddock-cache`. Copy its **ID** and paste it into `wrangler.jsonc` in place of the zeros in
    `NEXT_INC_CACHE_KV`. KV is free and needs no payment method — unlike R2, which is why the cache is
-   on KV here.
+   on KV here. The per-visitor counters also live in R2 (`NEXT_INC_CACHE_R2_BUCKET`); on a KV-only
+   account they fall back to per-isolate memory, which still throttles a burst but is looser than the
+   hosted preview.
 2. **Workers & Pages → Create → Worker → Connect to Git**, pick `derrylln/brewingpaddock`, branch `main`.
 3. Name the Worker **`brewing-paddock`** — it must match `name` in `wrangler.jsonc` or the build fails.
 4. Build command: `npm run build:worker` · Deploy command: `npm run deploy:worker`.

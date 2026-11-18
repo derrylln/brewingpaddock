@@ -30,6 +30,7 @@ export default function StrategyForecastPanel() {
   const [error, setError] = useState<string | null>(null);
   const [read, setRead] = useState<AiRead | null>(null);
   const [reading, setReading] = useState(false);
+  const [readError, setReadError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -48,17 +49,21 @@ export default function StrategyForecastPanel() {
   const askDesk = async () => {
     if (!forecast) return;
     setReading(true);
+    setReadError(null);
     try {
       const res = await fetch("/api/ai/strategy/forecast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ round: forecast.race.round }),
       });
-      if (!res.ok) throw new Error("offline");
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? "The desk is offline.");
+      }
       const data = (await res.json()) as { read: AiRead };
       setRead(data.read);
-    } catch {
-      setRead({ text: forecast.call, source: "model", model: null });
+    } catch (err) {
+      setReadError((err as Error).message);
     } finally {
       setReading(false);
     }
@@ -147,6 +152,7 @@ export default function StrategyForecastPanel() {
               ? read.text
               : "Ask for the pre-weekend read: why the model likes the front-running plan, what the alternatives give up, and the one race event that would flip it."}
           </p>
+          {readError ? <p className="ai-error mono">{readError}</p> : null}
           <button type="button" className="btn btn-ghost ai-btn" onClick={askDesk} disabled={reading}>
             {reading ? "Reading the forecast…" : read ? "Read it again" : "Ask the desk"}
           </button>

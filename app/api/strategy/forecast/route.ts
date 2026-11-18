@@ -1,31 +1,27 @@
 import { NextResponse } from "next/server";
-import { getSeasonOverview } from "@/lib/f1";
-import { circuitForRace, forecastRace } from "@/lib/strategy-forecast";
+import { getNextForecast } from "@/lib/forecast";
+import { LIMITS, guard, withGuardHeaders } from "@/lib/rate-limit";
 
-export const revalidate = 600;
+/**
+ * The next race on the calendar, priced plan by plan.
+ *
+ * The forecast is deterministic, so it is cached per round for ten minutes
+ * (memory + Workers Cache API) instead of being recomputed for every visitor,
+ * and each visitor is limited to 20 calls a minute.
+ */
+export async function GET(request: Request) {
+  const gate = await guard(request, "forecast", LIMITS.forecast.limit, LIMITS.forecast.windowMs);
+  if (!gate.ok) return gate.response;
 
-/** The next race on the calendar, priced plan by plan. */
-export async function GET() {
   try {
-    const overview = await getSeasonOverview();
-    const race = overview.nextRace ?? overview.schedule[overview.schedule.length - 1] ?? null;
-    if (!race) {
-      return NextResponse.json({ error: "No race on the calendar." }, { status: 404 });
-    }
-
-    const forecast = forecastRace(
-      circuitForRace({
-        raceName: race.raceName,
-        circuitId: race.Circuit.circuitId,
-        round: Number(race.round),
-        date: race.date,
-        country: race.Circuit.Location.country,
+    const forecast = await getNextForecast();
+    return withGuardHeaders(
+      NextResponse.json(forecast, {
+        headers: {
+          "Cache-Control": "public, max-age=300, s-maxage=600, stale-while-revalidate=3600",
+        },
       }),
-    );
-
-    return NextResponse.json(
-      { ...forecast, season: overview.season, upcoming: overview.nextRace !== null },
-      { headers: { "Cache-Control": "public, max-age=300, s-maxage=600" } },
+      gate,
     );
   } catch (error) {
     console.error("[strategy/forecast] failed", error);
