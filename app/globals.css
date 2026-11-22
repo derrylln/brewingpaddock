@@ -4589,6 +4589,19 @@ select.input {
   font-variant-numeric: tabular-nums;
 }
 
+.record-legend {
+  margin: -6px 0 14px;
+  font-size: 9.5px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+}
+
+.record-legend strong {
+  font-weight: 500;
+  color: var(--dim);
+}
+
 .record-lock {
   display: flex;
   align-items: center;

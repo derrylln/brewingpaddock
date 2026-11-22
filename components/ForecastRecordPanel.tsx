@@ -86,7 +86,7 @@ export default function ForecastRecordPanel() {
               </strong>
             </div>
             <div>
-              <span className="mono label">Frozen before the flag</span>
+              <span className="mono label">Calls saved pre-race</span>
               <strong className="mono">
                 {record.saved}/{record.scored}
               </strong>
@@ -94,6 +94,11 @@ export default function ForecastRecordPanel() {
           </div>
         ) : null}
       </div>
+
+      <p className="record-legend">
+        <strong>saved</strong> was written down before that race and cannot change;{" "}
+        <strong>replay</strong> is today&apos;s model rerun on a past race.
+      </p>
 
       {record.locked ? (
         <div className="record-lock">
