@@ -1,11 +1,12 @@
 import { cached } from "@/lib/cache";
-import { readForecastLog, type SavedForecast } from "@/lib/forecast-log";
+import { readForecastLog, type SavedForecast } from "@/lib/pre-race-log";
 import {
   SNAPSHOT,
   getPitStops,
   getSchedule,
   getSeasonResults,
   isFinisher,
+  raceFinished,
   resolveSeason,
   type PitStop,
   type Race,
@@ -15,7 +16,7 @@ import { circuitForRace, forecastRace } from "@/lib/strategy-forecast";
 /**
  * Forecast versus actual.
  *
- * Rounds that have a frozen entry in `lib/forecast-log.ts` are scored against
+ * Rounds that have a frozen entry in `lib/pre-race-log.ts` are scored against
  * the call that was saved before the race, so retuning the model afterwards
  * cannot rewrite the record. Rounds from before the log existed — and any round
  * nobody visited before the lights went out — are replayed with the current
@@ -127,8 +128,9 @@ export function getForecastRecord(): Promise<ForecastRecord> {
     const season = await resolveSeason();
     const [schedule, log] = await Promise.all([getSchedule(season), readForecastLog(season)]);
 
-    const today = new Date().toISOString().slice(0, 10);
-    const completed = schedule.filter((race) => race.date < today).slice(-WINDOW);
+    // Completion is the scheduled start plus a race window, not the calendar
+    // date: a race that has already run still counts on its own date.
+    const completed = schedule.filter((race) => raceFinished(race)).slice(-WINDOW);
 
     // The snapshot already carries every result and pit log it covers, so trust it
     // for those rounds and go live only for rounds that happened since.

@@ -362,6 +362,29 @@ function isoToday(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Generous race window: a Sunday race is only counted as run after this. */
+const RACE_WINDOW_MS = 3 * 60 * 60 * 1000;
+
+/**
+ * When the race actually starts, in UTC. Dates alone are not enough: a race can
+ * run and finish on its own calendar date, and a page that only moves on at
+ * midnight keeps forecasting a race that has already been won.
+ */
+export function raceStart(race: { date: string; time?: string }): Date {
+  const time = race.time?.trim();
+  if (time) {
+    const stamp = `${race.date}T${time}`;
+    const parsed = new Date(/(Z|[+-]\d\d:?\d\d)$/.test(stamp) ? stamp : `${stamp}Z`);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  const fallback = new Date(`${race.date}T00:00:00Z`);
+  return Number.isNaN(fallback.getTime()) ? new Date() : fallback;
+}
+
+export function raceFinished(race: { date: string; time?: string }, now = new Date()): boolean {
+  return raceStart(race).getTime() + RACE_WINDOW_MS <= now.getTime();
+}
+
 /** Pick the newest season that actually has standings, so a fresh January still renders. */
 export const resolveSeason = cache(async (): Promise<number> => {
   const year = new Date().getUTCFullYear();
@@ -383,8 +406,11 @@ export const getSeasonOverview = cache(async (): Promise<SeasonOverview> => {
   const schedule = await getSchedule(season);
 
   const today = isoToday();
-  const nextRace = schedule.find((race) => race.date >= today) ?? null;
-  const past = schedule.filter((race) => race.date < today);
+  const now = new Date();
+  // Start times, not dates: once the lights go out the page rolls on to the next
+  // round instead of forecasting a race that is already running.
+  const nextRace = schedule.find((race) => raceStart(race).getTime() > now.getTime()) ?? null;
+  const past = schedule.filter((race) => raceFinished(race, now));
   const lastRace = past.length > 0 ? past[past.length - 1] : null;
   const lastPodium = lastRace ? (await getRaceResults(season, lastRace.round)).slice(0, 3) : [];
 

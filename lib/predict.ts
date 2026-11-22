@@ -31,7 +31,16 @@ export type Backtest = {
 };
 
 export type Prediction = {
-  race: { round: number; name: string; circuit: string; country: string; date: string };
+  season: number;
+  race: {
+    round: number;
+    name: string;
+    circuit: string;
+    country: string;
+    date: string;
+    /** Scheduled start, used to freeze the call before the lights go out. */
+    time?: string;
+  };
   rows: PredictionRow[];
   sims: number;
   backtest: Backtest | null;
@@ -69,8 +78,8 @@ function stdev(values: number[]): number {
   return Math.sqrt(variance);
 }
 
-const WEIGHTS = { quali: 0.28, form: 0.36, team: 0.14, consistency: 0.12, champ: 0.1 };
-const W_RECENCY = [0.1, 0.15, 0.2, 0.25, 0.3];
+export const WEIGHTS = { quali: 0.28, form: 0.36, team: 0.14, consistency: 0.12, champ: 0.1 };
+export const W_RECENCY = [0.1, 0.15, 0.2, 0.25, 0.3];
 
 /** Build a score in 0..1 for every driver, then simulate the race 4,000 times. */
 export async function buildPrediction(): Promise<Prediction> {
@@ -270,12 +279,14 @@ export async function buildPrediction(): Promise<Prediction> {
   const dataPoints = seasonResults.reduce((sum, round) => sum + round.results.length, 0);
 
   return {
+    season,
     race: {
       round: race ? Number(race.round) : 0,
       name: race?.raceName ?? "Next Grand Prix",
       circuit: race?.Circuit.circuitName ?? "—",
       country: race?.Circuit.Location.country ?? "—",
       date: race?.date ?? "",
+      time: race?.time,
     },
     rows,
     sims,

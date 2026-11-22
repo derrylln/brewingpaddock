@@ -1,5 +1,5 @@
 import { cached } from "@/lib/cache";
-import { saveForecast } from "@/lib/forecast-log";
+import { saveForecast } from "@/lib/pre-race-log";
 import { getSeasonOverview } from "@/lib/f1";
 import { circuitForRace, forecastRace } from "@/lib/strategy-forecast";
 

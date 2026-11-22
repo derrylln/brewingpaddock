@@ -103,7 +103,7 @@ pit-stop log — the winner's stop count, the median stop count and first-stop l
 of the top ten, and whether the favourite's shape matched.
 
 The forecast is **frozen before the race**. The first time the next race's
-forecast is built before the lights go out, `lib/forecast-log.ts` writes it to
+forecast is built before the lights go out, `lib/pre-race-log.ts` writes it to
 the deployment's R2 bucket (`bp-forecast/<season>.json`) and never touches that
 entry again, so retuning the model cannot rewrite what was called that week. The
 stored entry keeps every priced plan, not just the favourite, so a later model
@@ -122,6 +122,28 @@ The builder is cheap on a cold start: the bundled snapshot answers for rounds it
 already covers, live season results and pit logs are fetched in parallel only
 for anything newer, and the log is read alongside the schedule rather than after
 it.
+
+A round counts as completed from its **scheduled start plus a race window**, not
+from its calendar date, so a race that ran on today's date is scored the same
+day. The same start-time rule decides `nextRace`: once the lights go out, `/strategy`
+and `/predict` roll on to the next weekend on their own (the calendar is cached
+for ten minutes, so a new visitor gets the new race within that window; a tab
+left open keeps its old payload until reload).
+
+## Predictor
+
+`/predict` runs the seeded Monte Carlo forecast and, below it, the model's own
+track record (`GET /api/predict/record`, `lib/predict-record.ts`). Each completed
+round is scored on the model's ordering rather than its simulation noise: was the
+winner its top pick, was the winner in its top three, how many of the real podium
+and top ten did it place. Headline figures are "winner in top three", podium hit
+rate and top-ten hit rate across the last eight rounds.
+
+The ranking is frozen before the race by the same log (`bp-predict/<season>.json`)
+and `savePrediction`, so rounds called after this shipped are marked `saved` and
+cannot be rewritten by a retune. Older rounds are `replay`: the five factors are
+run on the data available at the time — every round before the target, with that
+race's grid standing in for a qualifying session the archive does not keep.
 
 ## Instagram feed
 
