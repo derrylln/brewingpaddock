@@ -164,6 +164,9 @@ export type StrategyInput = {
   gapAhead: number;
   gapBehind: number;
   safetyCar: boolean;
+  /** A safety car expected inside these laps, rather than one on track right now.
+   *  The forecast prices the stop cheaply only if it falls in the window. */
+  safetyCarWindow?: { from: number; to: number };
   trackTemp: number;
   rain: Rain;
 };
@@ -200,18 +203,29 @@ function simulate(input: StrategyInput, circuit: CircuitProfile, plan: Plan): St
   let stintStart = Math.max(1, input.lap - input.tyreAge);
   let stopsDone = 0;
   const pitLaps = new Map(plan.stops.map((stop) => [stop.lap, stop.compound]));
+  const window = input.safetyCarWindow;
+  // A forecasted safety car is only cheap while it is actually out; the lab's
+  // "safety car now" still covers the next few laps from the current one.
+  const cheapStop = (lap: number) =>
+    window
+      ? lap >= window.from && lap <= window.to
+      : input.safetyCar && lap <= input.lap + 3;
 
   for (let lap = input.lap; lap <= input.totalLaps; lap += 1) {
     if (pitLaps.has(lap) && lap > 1) {
       stints.push({ compound, fromLap: stintStart, toLap: lap - 1 });
-      const loss = input.safetyCar && lap <= input.lap + 3 ? circuit.pitLoss * 0.42 : circuit.pitLoss;
+      const loss = cheapStop(lap) ? circuit.pitLoss * 0.42 : circuit.pitLoss;
       total += loss;
       stopsDone += 1;
       compound = pitLaps.get(lap) as Compound;
       age = 0;
       stintStart = lap;
-      if (input.safetyCar && lap <= input.lap + 3) {
-        notes.push("Safety car on track: pit loss drops to roughly 40% of a green-flag stop.");
+      if (cheapStop(lap)) {
+        notes.push(
+          window
+            ? `Stop on lap ${lap} falls inside the safety-car window: pit loss drops to roughly 40% of a green-flag stop.`
+            : "Safety car on track: pit loss drops to roughly 40% of a green-flag stop.",
+        );
       }
       if (input.gapBehind < 2.2 && lap === input.lap) {
         notes.push("Rejoining in traffic — you will lose around 1.2s behind the car you just covered.");

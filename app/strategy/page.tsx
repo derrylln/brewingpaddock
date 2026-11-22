@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import ForecastRecordPanel from "@/components/ForecastRecordPanel";
 import StrategyForecastPanel from "@/components/StrategyForecastPanel";
 import StrategyLab from "@/components/StrategyLab";
 
@@ -21,12 +22,14 @@ export default function StrategyPage() {
           </h1>
           <p className="page-deck">
             First the forecast: every sensible plan for the next race, priced across track
-            temperature and safety-car scenarios, so you can see what the grid is most likely to do
-            before a wheel turns. Then set your own scenario — a safety car, a dying hard tyre, a
-            drying track — and price every pit window to the flag.
+            temperature and late-race safety-car windows, so you can see what the grid is most
+            likely to do before a wheel turns. Below it, the same model rerun on the completed
+            rounds, so the calls can be judged against the pit log. Then set your own scenario — a
+            safety car, a dying hard tyre, a drying track — and price every pit window to the flag.
           </p>
         </header>
         <StrategyForecastPanel />
+        <ForecastRecordPanel />
         <StrategyLab />
       </div>
     </div>

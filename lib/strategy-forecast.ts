@@ -145,15 +145,102 @@ export function circuitForRace(race: {
   };
 }
 
-type Scenario = { safetyCar: boolean; trackTemp: number; weight: number; note: string };
+type Scenario = {
+  safetyCar: boolean;
+  window?: { from: number; to: number };
+  trackTemp: number;
+  weight: number;
+  note: string;
+};
 
-const SCENARIOS: Scenario[] = [
-  { safetyCar: false, trackTemp: 22, weight: 0.3, note: "cool track, clean race" },
-  { safetyCar: false, trackTemp: 30, weight: 0.28, note: "typical track temperature" },
-  { safetyCar: false, trackTemp: 40, weight: 0.14, note: "hot track, faster degradation" },
-  { safetyCar: true, trackTemp: 26, weight: 0.22, note: "safety car in the middle third" },
-  { safetyCar: true, trackTemp: 34, weight: 0.06, note: "safety car, warm track" },
-];
+/**
+ * Safety-car exposure per circuit: the chance of at least one deployment.
+ * Street tracks and low-grip layouts where passing is hard sit high; the
+ * permanent, low-degradation circuits sit low. This replaces the flat 28% the
+ * forecast used to apply to every race.
+ */
+const SC_PROBABILITY: Partial<Record<CircuitKey, number>> = {
+  marina_bay: 0.6,
+  zandvoort: 0.46,
+  interlagos: 0.4,
+  spa: 0.36,
+  silverstone: 0.32,
+  las_vegas: 0.26,
+  monza: 0.22,
+  yas_marina: 0.2,
+};
+
+function safetyCarProbability(key: CircuitKey | null, profile: CircuitProfile): number {
+  const explicit = key ? SC_PROBABILITY[key] : undefined;
+  if (explicit !== undefined) return explicit;
+  const overtaking =
+    profile.overtaking === "hard" ? 0.16 : profile.overtaking === "medium" ? 0.06 : 0.02;
+  return Math.min(0.6, 0.16 + overtaking + Math.max(0, profile.abrasion - 1) * 0.16);
+}
+
+/**
+ * The scenario set, weighted by late-race conditions rather than a flat average.
+ *
+ * Two things move the weights:
+ *
+ * - Degradation pressure. On a high-abrasion circuit the hot-track outcomes are
+ *   likelier and the cool ones less so, because the race is decided by who
+ *   manages the tyre at the end.
+ * - Safety cars, timed where they happen. Most deployments fall in the second
+ *   half, and a cheap stop only exists if the stop falls inside the window, so
+ *   the window is passed to the model instead of a lap-1 flag.
+ */
+function scenariosFor(profile: CircuitProfile, key: CircuitKey | null): Scenario[] {
+  const laps = profile.laps;
+  const scProb = safetyCarProbability(key, profile);
+  const deg = profile.abrasion;
+
+  // Hotter races push weight towards fresh rubber late; cool ones towards track position.
+  const cool = Math.max(0.08, 0.34 - (deg - 0.9) * 0.22);
+  const typical = 0.46;
+  const hot = Math.max(0.08, 0.2 + (deg - 0.9) * 0.24);
+  const cleanBudget = 1 - scProb;
+  const tempTotal = cool + typical + hot;
+
+  const thirdQuarter = { from: Math.round(laps * 0.5), to: Math.round(laps * 0.72) };
+  const finalQuarter = { from: Math.round(laps * 0.72), to: laps };
+  const lateShare = 0.72;
+
+  return [
+    {
+      safetyCar: false,
+      trackTemp: 22,
+      weight: (cleanBudget * cool) / tempTotal,
+      note: "cool track, clean race",
+    },
+    {
+      safetyCar: false,
+      trackTemp: 30,
+      weight: (cleanBudget * typical) / tempTotal,
+      note: "typical track temperature",
+    },
+    {
+      safetyCar: false,
+      trackTemp: 40,
+      weight: (cleanBudget * hot) / tempTotal,
+      note: "hot track, faster degradation",
+    },
+    {
+      safetyCar: true,
+      window: thirdQuarter,
+      trackTemp: 30,
+      weight: scProb * (1 - lateShare),
+      note: "safety car in the third quarter",
+    },
+    {
+      safetyCar: true,
+      window: finalQuarter,
+      trackTemp: 34,
+      weight: scProb * lateShare,
+      note: "safety car in the final quarter",
+    },
+  ];
+}
 
 const STARTS: Array<{ compound: Compound; weight: number }> = [
   { compound: "medium", weight: 0.5 },
@@ -206,6 +293,7 @@ export function forecastRace(race: ForecastRace): StrategyForecast {
   const profile = profileFor(race.circuit, race.laps || 57, race.circuitName);
   const totalLaps = profile.laps;
   const plans = planShapes(totalLaps);
+  const scenarios = scenariosFor(profile, race.circuit);
 
   const groups = new Map<
     string,
@@ -213,7 +301,7 @@ export function forecastRace(race: ForecastRace): StrategyForecast {
   >();
   let weightTotal = 0;
 
-  for (const scenario of SCENARIOS) {
+  for (const scenario of scenarios) {
     for (const start of STARTS) {
       const weight = scenario.weight * start.weight;
       weightTotal += weight;
@@ -231,6 +319,7 @@ export function forecastRace(race: ForecastRace): StrategyForecast {
             gapAhead: 1.5,
             gapBehind: 1.5,
             safetyCar: scenario.safetyCar,
+            safetyCarWindow: scenario.window,
             trackTemp: scenario.trackTemp,
             rain: "dry",
           },
@@ -287,9 +376,13 @@ export function forecastRace(race: ForecastRace): StrategyForecast {
 
   const favourite = ranked[0];
   const alternative = ranked[1];
+  const scProb = scenarios
+    .filter((scenario) => scenario.safetyCar)
+    .reduce((sum, scenario) => sum + scenario.weight, 0);
+  const lateShare = 0.72;
   const call = favourite
     ? `${favourite.label} leads the forecast at ${Math.round(favourite.probability * 100)}% across ${
-        SCENARIOS.length
+        scenarios.length
       } weather and safety-car scenarios${
         favourite.stops > 0
           ? `, with the stop around lap ${favourite.pitLaps[0]}`
@@ -302,13 +395,21 @@ export function forecastRace(race: ForecastRace): StrategyForecast {
   return {
     race,
     plans: ranked,
-    scenarios: SCENARIOS.length * STARTS.length,
+    scenarios: scenarios.length * STARTS.length,
     assumptions: [
-      `Track temperature modelled at ${SCENARIOS.filter((s) => !s.safetyCar)
-        .map((s) => `${s.trackTemp}°C`)
-        .join(", ")}.`,
-      "Safety car priced in 28% of scenarios at the circuit's normal likelihood.",
+      `Track temperature modelled at ${scenarios
+        .filter((scenario) => !scenario.safetyCar)
+        .map((scenario) => `${scenario.trackTemp}°C`)
+        .join(", ")}, weighted by the circuit's degradation pressure (abrasion ${profile.abrasion.toFixed(
+        2,
+      )}).`,
+      `Safety car priced at ${Math.round(scProb * 100)}% for ${profile.name}: ${Math.round(
+        scProb * (1 - lateShare) * 100,
+      )}% in the third quarter and ${Math.round(
+        scProb * lateShare * 100,
+      )}% in the final quarter, not on lap one.`,
       "Dry running only: this is the baseline plan, not a wet-race call.",
+      "A stop inside a safety-car window is priced at roughly 40% of a green-flag pit loss.",
       "Percentages are weighted scenario wins, so the plan with the fastest single projection is not always the favourite.",
     ],
     call,

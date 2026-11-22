@@ -83,6 +83,28 @@ from the calendar; `POST /api/ai/strategy/forecast` adds the desk's read. The
 scenario lab below it is unchanged: set a lap, tyre, gaps and weather and price
 every window from there.
 
+The weights are set by late-race conditions, not a flat average
+(`scenariosFor` in `lib/strategy-forecast.ts`):
+
+- **Safety cars are timed and circuit-specific.** Each circuit has its own
+  deployment probability (Marina Bay 60%, Monza 22%, with a formula fallback for
+  tracks without a bespoke profile) and 72% of that exposure sits in the second
+  half of the race, weighted towards the final quarter. A safety-car scenario now
+  passes a window to the stint model, so a stop is only cheap if it actually
+  falls inside the deployment — previously the flag discounted stops on lap 2.
+- **Track temperature is weighted by degradation pressure.** A high-abrasion
+  circuit shifts weight towards the hot-track outcomes, where fresh rubber late
+  is worth more; a low-abrasion one shifts it towards the cool, track-position
+  races.
+
+Below the forecast is the **record** (`GET /api/strategy/record`,
+`lib/forecast-record.ts`): the same model rerun over the last eight completed
+rounds, next to the official pit-stop log — the winner's stop count, the median
+stop count and first-stop lap of the top ten, and whether the favourite's shape
+matched. It is a backtest, not a stored prediction (nothing is saved before a
+race), so tuning the model rewrites the history; the panel and the data both say
+so plainly instead of implying a live track record.
+
 ## Instagram feed
 
 The homepage cover flow reads from `lib/instagram.ts`. With an
