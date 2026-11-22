@@ -25,6 +25,8 @@ export type ForecastRace = {
   circuitName: string;
   laps: number;
   date: string;
+  /** Scheduled start, where the calendar has one; the cutoff for a pre-race save. */
+  time?: string;
   country: string;
 };
 
@@ -127,6 +129,7 @@ export function circuitForRace(race: {
   round: number;
   date: string;
   country: string;
+  time?: string;
   laps?: number;
 }): ForecastRace {
   const id = race.circuitId.toLowerCase().replace(/[^a-z]/g, "");
@@ -141,6 +144,7 @@ export function circuitForRace(race: {
     circuitName: profile.name,
     laps: profile.laps,
     date: race.date,
+    time: race.time,
     country: race.country,
   };
 }

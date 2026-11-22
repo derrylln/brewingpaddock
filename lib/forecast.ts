@@ -1,4 +1,5 @@
 import { cached } from "@/lib/cache";
+import { saveForecast } from "@/lib/forecast-log";
 import { getSeasonOverview } from "@/lib/f1";
 import { circuitForRace, forecastRace } from "@/lib/strategy-forecast";
 
@@ -21,9 +22,17 @@ export async function getNextForecast() {
           circuitId: race.Circuit.circuitId,
           round: Number(race.round),
           date: race.date,
+          time: race.time,
           country: race.Circuit.Location.country,
         }),
       );
+
+      // Freeze the call before the race. A failure here must not cost the
+      // visitor the forecast, so saveForecast keeps its own errors quiet.
+      await saveForecast(overview.season, priced).catch((error) => {
+        console.warn("[forecast] could not freeze the call", error);
+        return null;
+      });
 
       return { ...priced, season: overview.season, upcoming: overview.nextRace !== null };
     },

@@ -97,13 +97,31 @@ The weights are set by late-race conditions, not a flat average
   is worth more; a low-abrasion one shifts it towards the cool, track-position
   races.
 
-Below the forecast is the **record** (`GET /api/strategy/record`,
-`lib/forecast-record.ts`): the same model rerun over the last eight completed
-rounds, next to the official pit-stop log — the winner's stop count, the median
-stop count and first-stop lap of the top ten, and whether the favourite's shape
-matched. It is a backtest, not a stored prediction (nothing is saved before a
-race), so tuning the model rewrites the history; the panel and the data both say
-so plainly instead of implying a live track record.
+Below the forecast is the **track record** (`GET /api/strategy/record`,
+`lib/forecast-record.ts`): the last eight completed rounds next to the official
+pit-stop log — the winner's stop count, the median stop count and first-stop lap
+of the top ten, and whether the favourite's shape matched.
+
+The forecast is **frozen before the race**. The first time the next race's
+forecast is built before the lights go out, `lib/forecast-log.ts` writes it to
+the deployment's R2 bucket (`bp-forecast/<season>.json`) and never touches that
+entry again, so retuning the model cannot rewrite what was called that week. The
+stored entry keeps every priced plan, not just the favourite, so a later model
+can be compared with the call actually made. `GET /api/strategy/forecast`
+freezes the call; if nobody opens the forecast before the race, that round has
+no saved call.
+
+Rounds scored against a frozen entry are marked `saved pre-race`; rounds from
+before the log existed — and any round nobody visited in time — are rerun with
+today's model and marked `replay`. The panel and the payload both say which is
+which, so the table is a track record where one exists and an honestly labelled
+backtest where it does not. `locked` in the payload is the next frozen call,
+waiting on the flag.
+
+The builder is cheap on a cold start: the bundled snapshot answers for rounds it
+already covers, live season results and pit logs are fetched in parallel only
+for anything newer, and the log is read alongside the schedule rather than after
+it.
 
 ## Instagram feed
 

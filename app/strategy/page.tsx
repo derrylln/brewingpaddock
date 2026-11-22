@@ -23,9 +23,10 @@ export default function StrategyPage() {
           <p className="page-deck">
             First the forecast: every sensible plan for the next race, priced across track
             temperature and late-race safety-car windows, so you can see what the grid is most
-            likely to do before a wheel turns. Below it, the same model rerun on the completed
-            rounds, so the calls can be judged against the pit log. Then set your own scenario — a
-            safety car, a dying hard tyre, a drying track — and price every pit window to the flag.
+            likely to do before a wheel turns. Below it, the record: each pre-race call frozen when it
+            was made and scored against the pit log, with older rounds replayed and labelled as such.
+            Then set your own scenario — a safety car, a dying hard tyre, a drying track — and price
+            every pit window to the flag.
           </p>
         </header>
         <StrategyForecastPanel />

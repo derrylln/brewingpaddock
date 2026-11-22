@@ -4581,6 +4581,39 @@ select.input {
   font-variant-numeric: tabular-nums;
 }
 
+.record-lock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--red);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+}
+
+.record-lock .label {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+
+.record-lock p {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--dim);
+}
+
+.record-lock strong {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
 .record-table {
   display: flex;
   flex-direction: column;
@@ -4645,6 +4678,22 @@ select.input {
 
 .record-verdict.is-miss {
   color: var(--faint);
+}
+
+.record-src {
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.record-src.is-saved {
+  color: var(--ink);
+}
+
+.record-src.is-saved::before {
+  content: "● ";
+  color: var(--red);
 }
 
 .record-note {

@@ -1,26 +1,44 @@
 import { cached } from "@/lib/cache";
+import { readForecastLog, type SavedForecast } from "@/lib/forecast-log";
 import {
+  SNAPSHOT,
   getPitStops,
-  getSeasonOverview,
+  getSchedule,
   getSeasonResults,
   isFinisher,
+  resolveSeason,
   type PitStop,
+  type Race,
 } from "@/lib/f1";
 import { circuitForRace, forecastRace } from "@/lib/strategy-forecast";
 
 /**
  * Forecast versus actual.
  *
- * There is no stored prediction: nothing was saved before the race, so this
- * replays the current forecast over the completed rounds instead. That is a
- * backtest, not a track record, and the panel says so — tuning the model moves
- * this history too. It is still the only honest way to ask whether the calls
- * beat the field, given there is no database sitting behind the site.
+ * Rounds that have a frozen entry in `lib/forecast-log.ts` are scored against
+ * the call that was saved before the race, so retuning the model afterwards
+ * cannot rewrite the record. Rounds from before the log existed — and any round
+ * nobody visited before the lights went out — are replayed with the current
+ * model and labelled as such. The panel says which is which.
  *
  * "Actual" comes from the official pit-stop log: the winner's stop count, the
  * median stop count of the top ten finishers, and the median lap of their first
- * stop. Predicted is the favourite plan's shape and first pit lap.
+ * stop. Predicted is the frozen (or replayed) favourite's shape and first pit lap.
+ *
+ * The builder is kept cheap because the record is opened cold far more often
+ * than it changes (once a race): the bundled snapshot answers for rounds it
+ * already covers, the live season results are only fetched when it does not, and
+ * the stored log is read alongside the schedule instead of after it.
  */
+
+export type PredictedCall = {
+  label: string;
+  stops: number;
+  pitLaps: number[];
+  probability: number;
+  source: "saved" | "replay";
+  savedAt: string | null;
+};
 
 export type ForecastRecordRow = {
   round: number;
@@ -29,12 +47,7 @@ export type ForecastRecordRow = {
   date: string;
   winner: string;
   winnerTeam: string;
-  predicted: {
-    label: string;
-    stops: number;
-    pitLaps: number[];
-    probability: number;
-  };
+  predicted: PredictedCall;
   actual: {
     winnerStops: number;
     fieldStops: number | null;
@@ -49,8 +62,12 @@ export type ForecastRecord = {
   season: number;
   rows: ForecastRecordRow[];
   scored: number;
+  saved: number;
+  replayed: number;
   stopsHits: number;
   meanPitError: number | null;
+  /** The next race's frozen call, waiting on the flag. */
+  locked: SavedForecast | null;
   note: string;
 };
 
@@ -70,104 +87,161 @@ function codeOf(name: { code?: string; familyName: string }): string {
   return name.code ?? name.familyName.slice(0, 3).toUpperCase();
 }
 
-export function getForecastRecord(): Promise<ForecastRecord> {
-  return cached("forecast:record", 30 * 60_000, async () => {
-    const overview = await getSeasonOverview();
-    const season = overview.season;
-    const schedule = new Map(overview.schedule.map((race) => [Number(race.round), race]));
-    const results = await getSeasonResults(season);
+function snapshotPits(season: number, round: number): PitStop[] {
+  if (season !== SNAPSHOT.season) return [];
+  return SNAPSHOT.races[String(round)]?.pits ?? [];
+}
 
-    const completed = results
-      .filter((entry) => entry.results.length > 0 && schedule.has(entry.round))
-      .slice(-WINDOW);
-
-    const rows: ForecastRecordRow[] = [];
-
-    for (const entry of completed) {
-      const race = schedule.get(entry.round);
-      if (!race) continue;
-
+/** The current model's call, cached for the afternoon: it is only used to fill gaps. */
+function replayCall(season: number, race: Race): Promise<PredictedCall | null> {
+  return cached(
+    `forecast:round:${season}:${race.round}:${race.date}`,
+    6 * 60 * 60_000,
+    async (): Promise<PredictedCall | null> => {
       const forecast = forecastRace(
         circuitForRace({
           raceName: race.raceName,
           circuitId: race.Circuit.circuitId,
           round: Number(race.round),
           date: race.date,
+          time: race.time,
           country: race.Circuit.Location.country,
         }),
       );
       const favourite = forecast.plans[0];
-      if (!favourite) continue;
+      if (!favourite) return null;
+      return {
+        label: favourite.label,
+        stops: favourite.stops,
+        pitLaps: favourite.pitLaps,
+        probability: favourite.probability,
+        source: "replay",
+        savedAt: null,
+      };
+    },
+  );
+}
 
-      const pits = await getPitStops(season, entry.round);
-      // No pit log means the counts would read as an all-no-stop race, which is
-      // worse than leaving the round out.
-      if (pits.length === 0) continue;
+export function getForecastRecord(): Promise<ForecastRecord> {
+  return cached("forecast:record", 30 * 60_000, async () => {
+    const season = await resolveSeason();
+    const [schedule, log] = await Promise.all([getSchedule(season), readForecastLog(season)]);
 
-      const byDriver = new Map<string, PitStop[]>();
-      for (const stop of pits) {
-        const list = byDriver.get(stop.driverId) ?? [];
-        list.push(stop);
-        byDriver.set(stop.driverId, list);
-      }
+    const today = new Date().toISOString().slice(0, 10);
+    const completed = schedule.filter((race) => race.date < today).slice(-WINDOW);
 
-      const winnerResult = entry.results[0];
-      if (!winnerResult) continue;
-
-      const top = entry.results.filter((result) => isFinisher(result.status)).slice(0, 10);
-      const stopCounts = top.map((result) => (byDriver.get(result.Driver.driverId) ?? []).length);
-      const firstLaps = top
-        .map((result) => {
-          const stops = byDriver.get(result.Driver.driverId) ?? [];
-          if (stops.length === 0) return null;
-          return Math.min(...stops.map((stop) => Number(stop.lap) || Number.POSITIVE_INFINITY));
-        })
-        .filter((lap): lap is number => lap !== null && Number.isFinite(lap));
-
-      const winnerStops = (byDriver.get(winnerResult.Driver.driverId) ?? []).length;
-      const fieldStops = median(stopCounts);
-      const firstPitLap = median(firstLaps);
-      const predictedPit = favourite.pitLaps[0] ?? null;
-
-      rows.push({
-        round: entry.round,
-        raceName: entry.raceName.replace(" Grand Prix", ""),
-        circuitName: race.Circuit.circuitName,
-        date: race.date,
-        winner: codeOf(winnerResult.Driver),
-        winnerTeam: winnerResult.Constructor.name,
-        predicted: {
-          label: favourite.label,
-          stops: favourite.stops,
-          pitLaps: favourite.pitLaps,
-          probability: favourite.probability,
-        },
-        actual: {
-          winnerStops,
-          fieldStops,
-          firstPitLap,
-          finishers: top.length,
-        },
-        stopsHit: fieldStops !== null && favourite.stops === fieldStops,
-        pitDelta: predictedPit !== null && firstPitLap !== null ? firstPitLap - predictedPit : null,
-      });
+    // The snapshot already carries every result and pit log it covers, so trust it
+    // for those rounds and go live only for rounds that happened since.
+    const results = new Map(
+      season === SNAPSHOT.season ? SNAPSHOT.seasonResults.map((entry) => [entry.round, entry]) : [],
+    );
+    const covered = completed.every(
+      (race) => (results.get(Number(race.round))?.results.length ?? 0) > 0,
+    );
+    if (!covered) {
+      for (const entry of await getSeasonResults(season)) results.set(entry.round, entry);
     }
 
-    const deltas = rows
+    // Pit logs, in parallel, and only over the wire where the snapshot has none.
+    const pitsByRound = new Map(
+      await Promise.all(
+        completed.map(async (race): Promise<[number, PitStop[]]> => {
+          const round = Number(race.round);
+          const local = snapshotPits(season, round);
+          return [round, local.length > 0 ? local : await getPitStops(season, round)];
+        }),
+      ),
+    );
+
+    const locked =
+      Object.values(log.entries)
+        .filter((entry) => new Date(entry.start).getTime() > Date.now())
+        .sort((a, b) => a.start.localeCompare(b.start))[0] ?? null;
+
+    const rows = await Promise.all(
+      completed.map(async (race): Promise<ForecastRecordRow | null> => {
+        const round = Number(race.round);
+        const entry = results.get(round);
+        const pits = pitsByRound.get(round) ?? [];
+        // No pit log means the counts would read as an all-no-stop race, which is
+        // worse than leaving the round out.
+        if (!entry || entry.results.length === 0 || pits.length === 0) return null;
+
+        const frozen = log.entries[String(round)];
+        const predicted: PredictedCall | null = frozen
+          ? { ...frozen.favourite, source: "saved", savedAt: frozen.savedAt }
+          : await replayCall(season, race);
+        if (!predicted) return null;
+
+        const byDriver = new Map<string, PitStop[]>();
+        for (const stop of pits) {
+          const list = byDriver.get(stop.driverId) ?? [];
+          list.push(stop);
+          byDriver.set(stop.driverId, list);
+        }
+
+        const winnerResult = entry.results[0];
+        if (!winnerResult) return null;
+
+        const top = entry.results.filter((result) => isFinisher(result.status)).slice(0, 10);
+        const stopCounts = top.map((result) => (byDriver.get(result.Driver.driverId) ?? []).length);
+        const firstLaps = top
+          .map((result) => {
+            const stops = byDriver.get(result.Driver.driverId) ?? [];
+            if (stops.length === 0) return null;
+            return Math.min(...stops.map((stop) => Number(stop.lap) || Number.POSITIVE_INFINITY));
+          })
+          .filter((lap): lap is number => lap !== null && Number.isFinite(lap));
+
+        const winnerStops = (byDriver.get(winnerResult.Driver.driverId) ?? []).length;
+        const fieldStops = median(stopCounts);
+        const firstPitLap = median(firstLaps);
+        const predictedPit = predicted.pitLaps[0] ?? null;
+
+        return {
+          round,
+          raceName: entry.raceName.replace(" Grand Prix", ""),
+          circuitName: race.Circuit.circuitName,
+          date: race.date,
+          winner: codeOf(winnerResult.Driver),
+          winnerTeam: winnerResult.Constructor.name,
+          predicted,
+          actual: {
+            winnerStops,
+            fieldStops,
+            firstPitLap,
+            finishers: top.length,
+          },
+          stopsHit: fieldStops !== null && predicted.stops === fieldStops,
+          pitDelta:
+            predictedPit !== null && firstPitLap !== null ? firstPitLap - predictedPit : null,
+        };
+      }),
+    );
+
+    const scoredRows = rows
+      .filter((row): row is ForecastRecordRow => row !== null)
+      .sort((a, b) => b.round - a.round);
+
+    const deltas = scoredRows
       .map((row) => row.pitDelta)
       .filter((delta): delta is number => delta !== null);
+    const saved = scoredRows.filter((row) => row.predicted.source === "saved").length;
 
     return {
       season,
-      rows: rows.reverse(),
-      scored: rows.length,
-      stopsHits: rows.filter((row) => row.stopsHit).length,
+      rows: scoredRows,
+      scored: scoredRows.length,
+      saved,
+      replayed: scoredRows.length - saved,
+      stopsHits: scoredRows.filter((row) => row.stopsHit).length,
       meanPitError:
         deltas.length === 0
           ? null
           : Math.round((deltas.reduce((sum, delta) => sum + Math.abs(delta), 0) / deltas.length) * 10) /
             10,
-      note: "Rebuilt, not stored: each completed round is rerun through the current forecast, so tuning the model changes this history. Actual stop counts come from the official pit-stop log; the field figure is the median of the top ten finishers.",
+      locked,
+      note: "Rounds forecast before the race are frozen: the call saved that week stands even after the model is retuned, and is marked saved. Rounds from before the log existed — or where nobody opened the forecast before the flag — are rerun with today's model and marked replay. Actual stop counts come from the official pit-stop log; the field figure is the median of the top ten finishers.",
     };
   });
 }

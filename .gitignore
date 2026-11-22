@@ -25,3 +25,6 @@ artifacts/
 /freebuff-sites-build/
 /.open-next/
 /.wrangler/
+
+# local forecast log fallback
+.cache/

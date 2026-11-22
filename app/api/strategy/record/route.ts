@@ -3,9 +3,11 @@ import { getForecastRecord } from "@/lib/forecast-record";
 import { LIMITS, guard, withGuardHeaders } from "@/lib/rate-limit";
 
 /**
- * The forecast rerun on the completed rounds, so the strategy calls can be
- * judged against what actually happened. Cached half an hour: it only changes
- * when a race finishes.
+ * The forecast versus the pit log. Frozen calls are read from the forecast log;
+ * older rounds are replayed. Cached half an hour, and the build itself now reads
+ * the bundled snapshot and fan-outs the live pit logs instead of walking them
+ * one at a time, so the first visitor after a deploy does not wait on eight
+ * sequential upstream calls.
  */
 export async function GET(request: Request) {
   const gate = await guard(request, "forecast", LIMITS.forecast.limit, LIMITS.forecast.windowMs);
@@ -16,7 +18,7 @@ export async function GET(request: Request) {
     return withGuardHeaders(
       NextResponse.json(record, {
         headers: {
-          "Cache-Control": "public, max-age=600, s-maxage=1800, stale-while-revalidate=3600",
+          "Cache-Control": "public, max-age=600, s-maxage=1800, stale-while-revalidate=86400",
         },
       }),
       gate,

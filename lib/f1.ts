@@ -312,10 +312,13 @@ export const getSeasonResults = cache(async (season: number): Promise<SeasonResu
 
   const total = Number(first.MRData.total ?? 0);
   const extraPages = Math.max(0, Math.ceil(total / 100) - 1);
-  const rest: Array<Envelope<ResultsEnvelope> | null> = [];
-  for (let index = 0; index < extraPages; index += 1) {
-    rest.push(await requestJson<Envelope<ResultsEnvelope>>(path((index + 1) * 100), 600));
-  }
+  // Offsets are known once the total is in, so the remaining pages go out together
+  // instead of one after another. The request gate still caps concurrency.
+  const rest = await Promise.all(
+    Array.from({ length: extraPages }, (_, index) =>
+      requestJson<Envelope<ResultsEnvelope>>(path((index + 1) * 100), 600),
+    ),
+  );
 
   const byRound = new Map<number, { round: number; raceName: string; results: RaceResult[] }>();
   for (const page of [first, ...rest]) {
