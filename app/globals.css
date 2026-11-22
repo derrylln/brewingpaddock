@@ -4525,7 +4525,15 @@ select.input {
 
 /* Forecast record: the model rerun on completed rounds. */
 .record {
+  /* The record follows a card (predictor) or a section (strategist), so it
+     brings its own top gap instead of relying on the neighbour's. */
+  margin-top: 40px;
   margin-bottom: 40px;
+}
+
+/* The forecast already closes with its own 40px gap; don't double it. */
+.forecast + .record {
+  margin-top: 0;
 }
 
 .record-head {
