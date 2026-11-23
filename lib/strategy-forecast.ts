@@ -68,6 +68,9 @@ const ALIASES: Record<string, CircuitKey> = {
   abudhabi: "yas_marina",
   zandvoort: "zandvoort",
   netherlands: "zandvoort",
+  qatar: "qatar",
+  lusail: "qatar",
+  losail: "qatar",
 };
 
 const LAPS_BY_CIRCUIT: Record<string, number> = {
@@ -254,15 +257,23 @@ const STARTS: Array<{ compound: Compound; weight: number }> = [
 
 type Sample = { option: StrategyOption; scenario: Scenario; start: Compound };
 
-function planShapes(totalLaps: number): Array<Array<{ lap: number; compound: Compound }>> {
-  const plans: Array<Array<{ lap: number; compound: Compound }>> = [[]];
+function planShapes(
+  totalLaps: number,
+  minStops = 0,
+): Array<Array<{ lap: number; compound: Compound }>> {
+  const plans: Array<Array<{ lap: number; compound: Compound }>> = [];
   const dry: Compound[] = ["soft", "medium", "hard"];
   const firstWindow = { from: Math.round(totalLaps * 0.18), to: Math.round(totalLaps * 0.72) };
   const secondWindow = { from: Math.round(totalLaps * 0.42), to: Math.round(totalLaps * 0.85) };
 
-  for (const compound of dry) {
-    for (let lap = firstWindow.from; lap <= firstWindow.to; lap += 2) {
-      plans.push([{ lap, compound }]);
+  // A circuit can rule a plan out entirely. Qatar is a two-stop race, so no
+  // single-stop shape is even priced there: it would win on paper and lose to
+  // the rulebook, which is exactly how the forecast used to be wrong.
+  if (minStops < 2) {
+    for (const compound of dry) {
+      for (let lap = firstWindow.from; lap <= firstWindow.to; lap += 2) {
+        plans.push([{ lap, compound }]);
+      }
     }
   }
   for (const first of dry) {
@@ -283,7 +294,8 @@ function planShapes(totalLaps: number): Array<Array<{ lap: number; compound: Com
 
 function labelFor(option: StrategyOption): string {
   if (option.stops === 0) return "No stop";
-  return `${option.stops === 1 ? "One stop" : "Two stops"} · ${option.stints
+  const stops = option.stops === 1 ? "One stop" : option.stops === 2 ? "Two stops" : "Three stops";
+  return `${stops} · ${option.stints
     .map((stint) => stint.compound[0].toUpperCase())
     .join("→")}`;
 }
@@ -296,7 +308,8 @@ function meanLap(values: number[]): number {
 export function forecastRace(race: ForecastRace): StrategyForecast {
   const profile = profileFor(race.circuit, race.laps || 57, race.circuitName);
   const totalLaps = profile.laps;
-  const plans = planShapes(totalLaps);
+  const minStops = profile.minStops ?? 0;
+  const plans = planShapes(totalLaps, minStops);
   const scenarios = scenariosFor(profile, race.circuit);
 
   const groups = new Map<
@@ -388,9 +401,11 @@ export function forecastRace(race: ForecastRace): StrategyForecast {
     ? `${favourite.label} leads the forecast at ${Math.round(favourite.probability * 100)}% across ${
         scenarios.length
       } weather and safety-car scenarios${
-        favourite.stops > 0
-          ? `, with the stop around lap ${favourite.pitLaps[0]}`
-          : ", with no stop priced"
+        favourite.stops === 0
+          ? ", with no stop priced"
+          : favourite.stops === 1
+            ? `, with the stop around lap ${favourite.pitLaps[0]}`
+            : `, with stops around laps ${favourite.pitLaps.join(" and ")}`
       }. ${alternative ? `${alternative.label} is the live alternative at ${Math.round(
           alternative.probability * 100,
         )}%.` : "No credible alternative emerged."}`
@@ -401,6 +416,13 @@ export function forecastRace(race: ForecastRace): StrategyForecast {
     plans: ranked,
     scenarios: scenarios.length * STARTS.length,
     assumptions: [
+      ...(minStops > 0
+        ? [
+            `${profile.name} requires at least ${minStops} stops, so ${
+              minStops === 2 ? "single-stop" : "shorter"
+            } plans are not priced at all.`,
+          ]
+        : []),
       `Track temperature modelled at ${scenarios
         .filter((scenario) => !scenario.safetyCar)
         .map((scenario) => `${scenario.trackTemp}°C`)

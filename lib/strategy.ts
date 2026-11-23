@@ -7,7 +7,8 @@ export type CircuitKey =
   | "silverstone"
   | "spa"
   | "yas_marina"
-  | "zandvoort";
+  | "zandvoort"
+  | "qatar";
 
 export type CircuitProfile = {
   name: string;
@@ -16,6 +17,9 @@ export type CircuitProfile = {
   pitLoss: number;
   abrasion: number;
   overtaking: "easy" | "medium" | "hard";
+  /** Stops the circuit forces — a rule or a tyre that cannot go the distance.
+   *  Shorter plans are not priced at all, instead of being priced and written off. */
+  minStops?: number;
   note: string;
 };
 
@@ -91,6 +95,18 @@ export const CIRCUITS: Record<CircuitKey, CircuitProfile> = {
     abrasion: 1.05,
     overtaking: "hard",
     note: "Banked corners and one real passing spot: track position is currency.",
+  },
+  qatar: {
+    name: "Lusail",
+    laps: 57,
+    baseLap: 84.6,
+    pitLoss: 25.0,
+    abrasion: 1.4,
+    overtaking: "medium",
+    // One stint cannot legally or physically cover this race; the long,
+    // loaded corners cook the rears well before half distance.
+    minStops: 2,
+    note: "Lusail is a two-stop circuit: the high-speed load overheats the rears and a single stint does not go the distance.",
   },
 };
 
@@ -289,6 +305,7 @@ export function buildStrategies(input: StrategyInput): StrategyResult {
   const totalLaps = Math.max(input.lap + 1, Math.min(input.totalLaps, circuit.laps));
   const merged: StrategyInput = { ...input, totalLaps };
 
+  const minStops = circuit.minStops ?? 0;
   const plans: Plan[] = [{ stops: [] }];
   const compounds: Compound[] =
     input.rain === "heavy" ? ["wet", "inter"] : input.rain === "light" ? ["inter", "wet", "medium"] : input.rain === "drying" ? ["medium", "inter", "soft"] : ["medium", "hard", "soft"];
@@ -312,7 +329,11 @@ export function buildStrategies(input: StrategyInput): StrategyResult {
     }
   }
 
-  const options = plans
+  // A circuit that forces two stops rules the shorter plans out. Late enough in
+  // the race there may be no legal two-stop window left; then the plan list is
+  // still priced rather than coming back empty.
+  const feasible = plans.filter((plan) => plan.stops.length >= minStops);
+  const options = (feasible.length > 0 ? feasible : plans)
     .map((plan) => simulate(merged, circuit, plan))
     .sort((a, b) => a.totalTime - b.totalTime)
     .slice(0, 12);
@@ -331,10 +352,22 @@ export function buildStrategies(input: StrategyInput): StrategyResult {
         ? "The car ahead is close enough to cover a reactive stop."
         : "The car ahead is out of range; this is a free-strategy call.";
 
+  const noWindow =
+    minStops > 0 && feasible.length === 0
+      ? ` ${circuit.name} requires at least ${minStops} stops over the race distance, and from lap ${input.lap} there is no window left for another.`
+      : "";
   const call =
     best.stops === 0
-      ? `No stop needed. Extend the ${meta(input.compound).label.toLowerCase()} to the flag and manage the rear.`
-      : `${best.label}. ${improvement >= 0 ? `Projects ${improvement.toFixed(1)}s ahead of not stopping again, risk included` : `Only ${Math.abs(improvement).toFixed(1)}s worse than not stopping, so it is a defensive move`} with a ${best.risk} risk profile.`;
+      ? `No further stop is priceable from lap ${input.lap}.${noWindow} Extend the ${meta(
+          input.compound,
+        ).label.toLowerCase()} to the flag and manage the rear.`
+      : `${best.label}. ${
+          minStops > 0
+            ? `${circuit.name} forces at least ${minStops} stops, so shorter plans are not priced`
+            : improvement >= 0
+              ? `Projects ${improvement.toFixed(1)}s ahead of not stopping again, risk included`
+              : `Only ${Math.abs(improvement).toFixed(1)}s worse than not stopping, so it is a defensive move`
+        } with a ${best.risk} risk profile.`;
 
   const transcript: Array<{ role: "engineer" | "driver"; text: string }> = [
     {
