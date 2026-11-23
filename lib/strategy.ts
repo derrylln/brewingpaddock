@@ -1,5 +1,19 @@
 export type Compound = "soft" | "medium" | "hard" | "inter" | "wet";
 export type CircuitKey =
+  | "albert_park"
+  | "shanghai"
+  | "suzuka"
+  | "miami"
+  | "villeneuve"
+  | "monaco"
+  | "catalunya"
+  | "red_bull_ring"
+  | "hungaroring"
+  | "madring"
+  | "baku"
+  | "sepang"
+  | "americas"
+  | "rodriguez"
   | "interlagos"
   | "las_vegas"
   | "monza"
@@ -24,6 +38,134 @@ export type CircuitProfile = {
 };
 
 export const CIRCUITS: Record<CircuitKey, CircuitProfile> = {
+  albert_park: {
+    name: "Albert Park",
+    laps: 58,
+    baseLap: 82.5,
+    pitLoss: 21.5,
+    abrasion: 1.0,
+    overtaking: "medium",
+    note: "Resurfaced and fast, with a cheap stop: the undercut is live, and the front-left pays for the high-speed sweepers.",
+  },
+  shanghai: {
+    name: "Shanghai",
+    laps: 56,
+    baseLap: 95.8,
+    pitLoss: 23.0,
+    abrasion: 1.25,
+    overtaking: "medium",
+    note: "The long front-left corners grain the tyre early; the back straight is the only place to undo a bad stop.",
+  },
+  suzuka: {
+    name: "Suzuka",
+    laps: 53,
+    baseLap: 92.8,
+    pitLoss: 22.5,
+    abrasion: 1.35,
+    overtaking: "hard",
+    note: "The esses put a continuous load through the front-left, so one stop is a stretch and two is the default.",
+  },
+  miami: {
+    name: "Miami",
+    laps: 57,
+    baseLap: 92.2,
+    pitLoss: 22.0,
+    abrasion: 1.05,
+    overtaking: "medium",
+    note: "A street-style layout with one long straight: traction out of the slow corners decides tyre life.",
+  },
+  villeneuve: {
+    name: "Villeneuve",
+    laps: 70,
+    baseLap: 74.6,
+    pitLoss: 19.5,
+    abrasion: 0.85,
+    overtaking: "easy",
+    note: "Braking, traction and a very short pit lane — the cheapest stop on the calendar makes the undercut automatic.",
+  },
+  monaco: {
+    name: "Monaco",
+    laps: 78,
+    baseLap: 75.2,
+    pitLoss: 21.0,
+    abrasion: 0.6,
+    overtaking: "hard",
+    note: "Degradation is barely a factor; track position and the timing of a safety car decide the race.",
+  },
+  catalunya: {
+    name: "Catalunya",
+    laps: 66,
+    baseLap: 78.6,
+    pitLoss: 22.0,
+    abrasion: 1.3,
+    overtaking: "medium",
+    note: "The long right-handers in the final sector turn this into a front-left management race.",
+  },
+  red_bull_ring: {
+    name: "Red Bull Ring",
+    laps: 71,
+    baseLap: 67.7,
+    pitLoss: 19.0,
+    abrasion: 0.9,
+    overtaking: "easy",
+    note: "A short lap with a cheap stop and three DRS zones: track position is easy to lose and easy to regain.",
+  },
+  hungaroring: {
+    name: "Hungaroring",
+    laps: 70,
+    baseLap: 78.9,
+    pitLoss: 21.0,
+    abrasion: 1.2,
+    overtaking: "hard",
+    note: "Hot, twisty and with almost no straight to cool the tyres — passing is hard, so the stop must be earned.",
+  },
+  madring: {
+    name: "Madring",
+    laps: 57,
+    baseLap: 92.0,
+    pitLoss: 22.0,
+    abrasion: 1.05,
+    overtaking: "medium",
+    // New circuit with no race history yet: kept at a neutral street-circuit
+    // estimate rather than pretending to a measured abrasion figure.
+    note: "A new Madrid layout with no race history, so its pit loss and wear sit at a neutral street-circuit estimate.",
+  },
+  baku: {
+    name: "Baku",
+    laps: 51,
+    baseLap: 105.1,
+    pitLoss: 20.5,
+    abrasion: 0.7,
+    overtaking: "easy",
+    note: "Smooth asphalt and a huge slipstream: the tyres last, and the tow down the main straight is the passing tool.",
+  },
+  sepang: {
+    name: "Sepang",
+    laps: 56,
+    baseLap: 96.3,
+    pitLoss: 23.5,
+    abrasion: 1.35,
+    overtaking: "medium",
+    note: "Heat and two long fast corners punish the rears; the long pit lane makes each stop expensive.",
+  },
+  americas: {
+    name: "Circuit of the Americas",
+    laps: 56,
+    baseLap: 98.4,
+    pitLoss: 22.0,
+    abrasion: 1.2,
+    overtaking: "medium",
+    note: "The esses load the front-left and the bumps unsettle the rear; the back straight is the reward.",
+  },
+  rodriguez: {
+    name: "Rodriguez",
+    laps: 71,
+    baseLap: 79.9,
+    pitLoss: 20.5,
+    abrasion: 0.8,
+    overtaking: "easy",
+    note: "Thin air at altitude cools the tyres and the brakes; the run to Turn 1 is the only real passing chance.",
+  },
   interlagos: {
     name: "Interlagos",
     laps: 71,

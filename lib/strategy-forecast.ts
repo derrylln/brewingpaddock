@@ -52,6 +52,26 @@ export type StrategyForecast = {
 };
 
 const ALIASES: Record<string, CircuitKey> = {
+  albertpark: "albert_park",
+  shanghai: "shanghai",
+  suzuka: "suzuka",
+  miami: "miami",
+  villeneuve: "villeneuve",
+  montreal: "villeneuve",
+  monaco: "monaco",
+  catalunya: "catalunya",
+  barcelona: "catalunya",
+  redbullring: "red_bull_ring",
+  spielberg: "red_bull_ring",
+  hungaroring: "hungaroring",
+  madring: "madring",
+  baku: "baku",
+  sepang: "sepang",
+  americas: "americas",
+  austin: "americas",
+  cota: "americas",
+  rodriguez: "rodriguez",
+  mexicocity: "rodriguez",
   lasvegas: "las_vegas",
   interlagos: "interlagos",
   saopaulo: "interlagos",
@@ -74,6 +94,7 @@ const ALIASES: Record<string, CircuitKey> = {
 };
 
 const LAPS_BY_CIRCUIT: Record<string, number> = {
+  albertpark: 58,
   bahrain: 57,
   jeddah: 50,
   melbourne: 58,
@@ -168,12 +189,26 @@ type Scenario = {
  */
 const SC_PROBABILITY: Partial<Record<CircuitKey, number>> = {
   marina_bay: 0.6,
+  monaco: 0.55,
+  baku: 0.5,
   zandvoort: 0.46,
+  villeneuve: 0.45,
+  albert_park: 0.4,
   interlagos: 0.4,
   spa: 0.36,
+  miami: 0.35,
+  sepang: 0.35,
+  madring: 0.35,
   silverstone: 0.32,
+  suzuka: 0.3,
+  red_bull_ring: 0.3,
+  americas: 0.3,
+  rodriguez: 0.3,
   las_vegas: 0.26,
+  shanghai: 0.25,
+  hungaroring: 0.25,
   monza: 0.22,
+  catalunya: 0.2,
   yas_marina: 0.2,
 };
 
