@@ -1,3 +1,4 @@
+import recordedCalls from "@/data/recorded-calls.json";
 import { cached } from "@/lib/cache";
 import {
   SNAPSHOT,
@@ -28,6 +29,11 @@ import { readPredictLog, type SavedPrediction } from "@/lib/pre-race-log";
  * same five weighted factors are applied to the historic state and ranked
  * directly, so the table measures the model's ordering, not its Monte Carlo
  * noise. Actuals come from the classification: podium and top ten by position.
+ *
+ * A replay is a re-scoring, not a call: it runs today's model on data the
+ * archive no longer holds, so it can disagree with the board visitors saw. Only
+ * a call written down before the lights — the frozen log, or a board
+ * transcribed into `data/recorded-calls.json` — can be a called winner.
  */
 
 export type PredictRecordRow = {
@@ -44,6 +50,8 @@ export type PredictRecordRow = {
   winnerInTop3: boolean;
   podiumHits: number;
   top10Hits: number;
+  /** Places the call covered: 3 when only the board's top three was recorded. */
+  predictedSize: number;
 };
 
 export type PredictRecord = {
@@ -58,12 +66,27 @@ export type PredictRecord = {
   podiumRate: number | null;
   /** Share of top-ten slots (10 per race) the model placed, 0..1. */
   top10Rate: number | null;
+  /** Rounds with a full top ten to score, the denominator of `top10Rate`. */
+  top10Rounds: number;
   /** The next race's frozen ranking, waiting on the flag. */
   locked: SavedPrediction | null;
   note: string;
 };
 
 const WINDOW = 8;
+
+type RecordedCall = {
+  raceName: string;
+  date: string;
+  raceWinner?: string;
+  shown: string;
+  top: Array<{ code: string; name: string; team: string; win: number }>;
+};
+
+/** Boards the published page actually showed before a race, by season then round. */
+const RECORDED: Record<string, Record<string, RecordedCall>> = (
+  recordedCalls as { seasons: Record<string, Record<string, RecordedCall>> }
+).seasons;
 
 function codeOf(driver: RaceResult["Driver"]): string {
   return driver.code ?? driver.familyName.slice(0, 3).toUpperCase();
@@ -187,7 +210,7 @@ function classified(results: RaceResult[]): RaceResult[] {
 }
 
 export function getPredictRecord(): Promise<PredictRecord> {
-  return cached("predict:record", 30 * 60_000, async () => {
+  return cached("predict:record:v2", 30 * 60_000, async () => {
     const season = await resolveSeason();
     const [schedule, log] = await Promise.all([getSchedule(season), readPredictLog(season)]);
 
@@ -214,12 +237,16 @@ export function getPredictRecord(): Promise<PredictRecord> {
       if (!target || target.results.length === 0) continue;
 
       const frozen = log.entries[String(round)];
+      const recorded = RECORDED[String(season)]?.[String(round)];
+      const source = frozen || recorded ? "saved" : "replay";
       const predicted = frozen
         ? frozen.ranking.map((entry) => entry.code)
-        : rankFromHistory(
-            ordered.filter((entry) => entry.round < round),
-            target.results,
-          );
+        : recorded
+          ? recorded.top.map((entry) => entry.code)
+          : rankFromHistory(
+              ordered.filter((entry) => entry.round < round),
+              target.results,
+            );
       if (predicted.length === 0) continue;
 
       const podium = classified(target.results)
@@ -236,14 +263,16 @@ export function getPredictRecord(): Promise<PredictRecord> {
         round,
         raceName: target.raceName.replace(" Grand Prix", ""),
         date: race.date,
-        source: frozen ? "saved" : "replay",
+        source,
         predicted: predictedTop3,
         actual: podium,
         winner: winner ?? "—",
-        winnerCalled: winner !== undefined && predictedTop3[0] === winner,
+        // A replay is a re-scoring of today's model, never a pre-race call.
+        winnerCalled: source === "saved" && winner !== undefined && predictedTop3[0] === winner,
         winnerInTop3: winner !== undefined && predictedTop3.includes(winner),
         podiumHits: predictedTop3.filter((code) => podium.includes(code)).length,
         top10Hits: predictedTop10.filter((code) => top10.includes(code)).length,
+        predictedSize: predicted.length,
       });
     }
 
@@ -251,7 +280,10 @@ export function getPredictRecord(): Promise<PredictRecord> {
 
     const scored = rows.length;
     const podiumHits = rows.reduce((sum, row) => sum + row.podiumHits, 0);
-    const top10Hits = rows.reduce((sum, row) => sum + row.top10Hits, 0);
+    // A board captured as a top three only ranks three places, so the top-ten
+    // rate is measured across the rounds that actually called a top ten.
+    const fullCalls = rows.filter((row) => row.predictedSize >= 10);
+    const top10Hits = fullCalls.reduce((sum, row) => sum + row.top10Hits, 0);
     const saved = rows.filter((row) => row.source === "saved").length;
 
     return {
@@ -263,9 +295,10 @@ export function getPredictRecord(): Promise<PredictRecord> {
       winnerCalls: rows.filter((row) => row.winnerCalled).length,
       winnerTop3: rows.filter((row) => row.winnerInTop3).length,
       podiumRate: scored === 0 ? null : podiumHits / (scored * 3),
-      top10Rate: scored === 0 ? null : top10Hits / (scored * 10),
+      top10Rate: fullCalls.length === 0 ? null : top10Hits / (fullCalls.length * 10),
+      top10Rounds: fullCalls.length,
       locked,
-      note: "Calls frozen before the race are scored as they were made, and marked saved. Rounds without a frozen ranking are replayed with the model's five factors on the data available at the time — the rounds before it, plus that race's grid in place of a qualifying session the archive no longer holds — and marked replay. Podium and top-ten hits are measured against the classification.",
+      note: "Calls written down before the race are scored as they were made and marked saved: a ranking frozen in the log, or a board transcribed from the published page, which covers the top three only. Rounds without one are replayed with the model's five factors on the data available at the time — the rounds before it, plus that race's grid in place of a qualifying session the archive no longer holds — and marked replay. A replay is a re-scoring rather than a call, so it cannot be a called winner. Podium and top-ten hits are measured against the classification.",
     };
   });
 }

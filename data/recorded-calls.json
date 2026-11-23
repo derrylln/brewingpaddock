@@ -1,0 +1,18 @@
+{
+  "note": "Boards the published page actually showed before the lights went out, transcribed by hand. The pre-race log in R2 freezes a call automatically, but none was written for these rounds, and a replay re-ranks today's model on data the archive no longer holds, so it can disagree with what visitors saw. A board recorded here is scored exactly as it was displayed: top three only, which is why it is marked partial.",
+  "seasons": {
+    "2026": {
+      "21": {
+        "raceName": "Las Vegas",
+        "date": "2026-11-22",
+        "raceWinner": "VER",
+        "shown": "captured from the predictor page before the Las Vegas Grand Prix",
+        "top": [
+          { "code": "NOR", "name": "Norris", "team": "McLaren", "win": 0.208 },
+          { "code": "VER", "name": "Verstappen", "team": "Red Bull", "win": 0.167 },
+          { "code": "ANT", "name": "Antonelli", "team": "Mercedes", "win": 0.146 }
+        ]
+      }
+    }
+  }
+}

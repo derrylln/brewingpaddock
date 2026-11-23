@@ -110,7 +110,7 @@ export default function PredictRecordPanel() {
       <div className="panel">
         <div className="panel-head">
           <h3>Race by race</h3>
-          <span className="mono">frozen ranking, or replay, vs the classification</span>
+          <span className="mono">saved board or replay, vs the classification</span>
         </div>
         {record.rows.length === 0 ? (
           <p className="record-note">
@@ -147,7 +147,8 @@ export default function PredictRecordPanel() {
                         : "winner missed"}
                   </span>
                   <span className="mono record-dim">
-                    {row.podiumHits}/3 podium · {row.top10Hits}/10 points
+                    {row.podiumHits}/3 podium
+                    {row.predictedSize >= 10 ? ` · ${row.top10Hits}/10 points` : " · top three only"}
                   </span>
                   <span
                     className={`mono record-src${row.source === "saved" ? " is-saved" : ""}`}
