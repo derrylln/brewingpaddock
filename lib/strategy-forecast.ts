@@ -1,6 +1,7 @@
 import {
   CIRCUITS,
   pricePlanOn,
+  tyreLife,
   type CircuitKey,
   type CircuitProfile,
   type Compound,
@@ -464,6 +465,13 @@ export function forecastRace(race: ForecastRace): StrategyForecast {
         .join(", ")}, weighted by the circuit's degradation pressure (abrasion ${profile.abrasion.toFixed(
         2,
       )}).`,
+      `Tyre life follows that abrasion: at ${profile.name} the soft lasts ${tyreLife(
+        "soft",
+        profile.abrasion,
+      )} laps to the cliff, the medium ${tyreLife(
+        "medium",
+        profile.abrasion,
+      )} and the hard ${tyreLife("hard", profile.abrasion)}.`,
       `Safety car priced at ${Math.round(scProb * 100)}% for ${profile.name}: ${Math.round(
         scProb * (1 - lateShare) * 100,
       )}% in the third quarter and ${Math.round(

@@ -96,6 +96,12 @@ The weights are set by late-race conditions, not a flat average
   circuit shifts weight towards the hot-track outcomes, where fresh rubber late
   is worth more; a low-abrasion one shifts it towards the cool, track-position
   races.
+- **Tyre life scales with abrasion, not just the rate of loss.** `tyreLife` in
+  `lib/strategy.ts` divides the base life by the circuit's abrasion, so a soft
+  lasts 32 laps at Monaco and 14 at Lusail, and the total drop at the cliff stays
+  the same while the clock moves. The cliff check covers every stint, not only
+  the last one, so an over-long opening stint is priced instead of passing as
+  low risk. The forecast lists the three lives it used in its assumptions.
 
 Below the forecast is the **track record** (`GET /api/strategy/record`,
 `lib/forecast-record.ts`): the last eight completed rounds next to the official

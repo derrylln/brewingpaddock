@@ -254,6 +254,7 @@ export const CIRCUITS: Record<CircuitKey, CircuitProfile> = {
 
 type CompoundMeta = { label: string; offset: number; deg: number; life: number; code: string };
 
+/** `life` is the lap count at abrasion 1.0 — see tyreLife for the per-circuit figure. */
 const DRY: Record<"soft" | "medium" | "hard", CompoundMeta> = {
   soft: { label: "Soft", offset: -0.55, deg: 0.075, life: 19, code: "S" },
   medium: { label: "Medium", offset: 0, deg: 0.048, life: 27, code: "M" },
@@ -269,6 +270,18 @@ function meta(compound: Compound): CompoundMeta {
   if (compound === "inter") return WET_META;
   if (compound === "wet") return FULL_WET;
   return DRY[compound];
+}
+
+/** How many laps a compound lasts at a circuit's abrasion, cliff included.
+ *
+ *  Abrasion moves the clock, not the total: a tyre that loses time 40% faster
+ *  reaches its cliff in about 1/1.4 of the laps, so the penalty banked by the
+ *  end of the stint stays put while a high-abrasion race needs more stops than
+ *  a smooth one. Wets run a shorter life than the dry tyres they replace. */
+export function tyreLife(compound: Compound, abrasion: number): number {
+  const info = meta(compound);
+  const wet = compound === "inter" || compound === "wet";
+  return Math.max(8, Math.round((info.life / Math.max(0.4, abrasion)) * (wet ? 0.85 : 1)));
 }
 
 function compoundOffset(compound: Compound, rain: Rain): number {
@@ -303,7 +316,7 @@ function lapTime(
   const wet = compound === "inter" || compound === "wet";
   const tempFactor = 1 + Math.max(-0.25, (trackTemp - 30) * (wet ? 0.004 : 0.013));
   const slope = info.deg * circuit.abrasion * tempFactor;
-  const cliff = info.life * (wet ? 0.85 : 1);
+  const cliff = tyreLife(compound, circuit.abrasion);
   const age = Math.max(0, tyreAge);
   const withinLife = Math.min(age, cliff);
   const beyond = Math.max(0, age - cliff);
@@ -395,12 +408,27 @@ function simulate(input: StrategyInput, circuit: CircuitProfile, plan: Plan): St
   }
   stints.push({ compound, fromLap: stintStart, toLap: input.totalLaps });
 
-  const finalAge = stints[stints.length - 1].toLap - stints[stints.length - 1].fromLap + 1;
   const finalCompound = stints[stints.length - 1].compound;
-  const overLife = Math.max(0, finalAge - meta(finalCompound).life);
+  // Every stint is checked, not just the last one. A first stint 8 laps past the
+  // cliff costs the same as a last one, and on a high-abrasion circuit it is how
+  // an over-long one-stop wins on paper.
+  let overLife = 0;
+  let overStint: Stint | null = null;
+  for (const stint of stints) {
+    const laps = stint.toLap - stint.fromLap + 1;
+    const over = Math.max(0, laps - tyreLife(stint.compound, circuit.abrasion));
+    if (over > overLife) {
+      overLife = over;
+      overStint = stint;
+    }
+  }
 
-  if (overLife > 0) {
-    notes.push(`Runs ${overLife} laps past the ${meta(finalCompound).label.toLowerCase()} cliff — expect a late drop-off.`);
+  if (overStint) {
+    const laps = overStint.toLap - overStint.fromLap + 1;
+    const life = tyreLife(overStint.compound, circuit.abrasion);
+    notes.push(
+      `${laps} laps on the ${meta(overStint.compound).label.toLowerCase()} is ${overLife} past its ${life}-lap cliff at this circuit — that stint gives away time before the stop.`,
+    );
   }
   if (input.rain === "drying" && finalCompound !== "inter") {
     notes.push("Track is drying: staying on a dry tyre is quick now, but a late shower flips this call.");
