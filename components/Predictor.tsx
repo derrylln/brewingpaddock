@@ -62,6 +62,16 @@ export default function Predictor() {
           <p className="mono predict-sub">
             Round {data.race.round} · {data.race.circuit} · {raceDay(data.race.date)}
           </p>
+          <p className="mono predict-sub">
+            {data.weekend.quali === "this-weekend"
+              ? "Qualifying: this weekend"
+              : data.weekend.quali === "previous-round"
+                ? "Qualifying: last round, this weekend&apos;s not run"
+                : "Qualifying: none available"}
+            {data.weekend.practice
+              ? ` · Practice: ${data.weekend.practice}`
+              : " · Practice: none yet"}
+          </p>
         </div>
         <div className="predict-meta">
           <div>
@@ -169,14 +179,14 @@ export default function Predictor() {
         <div className="panel">
           <div className="panel-head">
             <h3>Sanity check</h3>
-            <span className="mono">grid-weighted backtest</span>
+            <span className="mono">walk-forward backtest</span>
           </div>
           {data.backtest ? (
             <>
               <p className="backtest-copy">
-                Applied retrospectively to the {data.backtest.raceName}, with grid position added as
-                a factor. {data.backtest.hits} of 3 predicted podium finishers matched the real
-                result.
+                Ranked on the {data.backtest.rounds} rounds before the {data.backtest.raceName},
+                with that race&apos;s grid standing in for qualifying. {data.backtest.hits} of 3
+                predicted podium finishers matched the real result.
               </p>
               <div className="backtest-grid">
                 <div>
