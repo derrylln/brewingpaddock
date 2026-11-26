@@ -16,8 +16,8 @@ export default function ModulesGrid({ latestRound }: { latestRound?: number }) {
       href: "/strategy",
       title: "Race Strategist",
       description:
-        "Feed it a safety car, a dying hard tyre or a drying track. The stint model prices every pit window and hands you the call, with the assumptions laid out.",
-      meta: "Interactive · stint model",
+        "Before a wheel turns, the stint model prices every sensible plan across track temperature and late safety cars, then scores its past calls against the pit log.",
+      meta: "Forecast · track record",
       wide: true,
     },
     {

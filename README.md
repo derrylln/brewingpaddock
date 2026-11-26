@@ -79,9 +79,8 @@ Retry, and the first paint can always fall back to the bundled
 plan shape (one, two or three stops, and which compounds) is priced across five weighted
 scenarios — three track temperatures plus safety-car variants — and the winners
 are grouped into the percentages shown. `GET /api/strategy/forecast` builds it
-from the calendar; `POST /api/ai/strategy/forecast` adds the desk's read. The
-scenario lab below it is unchanged: set a lap, tyre, gaps and weather and price
-every window from there.
+from the calendar; `POST /api/ai/strategy/forecast` adds the desk's read. Below it,
+the record freezes each pre-race call and scores it against the pit log.
 
 The weights are set by late-race conditions, not a flat average
 (`scenariosFor` in `lib/strategy-forecast.ts`):
@@ -251,7 +250,6 @@ to narrate it has been removed along with `POST /api/ai/telemetry`.
 Where it plugs in:
 
 - `POST /api/ask` — retrieval answers first, the model rephrases (grounded, same numbers).
-- `POST /api/ai/strategy` — recomputes the plan server-side, then writes the read.
 - `POST /api/ai/strategy/forecast` — rebuilds the race forecast from the calendar, then reads it.
 - `GET /api/predict` — adds `read` to the forecast payload, cached ten minutes per instance.
 - `/race/[round]` — extra analysis on the latest round only, so the archive costs nothing.
