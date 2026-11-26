@@ -74,15 +74,20 @@ export async function predictionRead(prediction: Prediction): Promise<AiRead> {
     ),
   ].join("\n");
 
-  return memoRead(`predict:v2:${prediction.race.round}`, async () => {
-  const completion = await aiText({
-    system: VOICE,
-    user: `DATA\n${data}\n\nTASK\nWrite the desk's read on this forecast: who the model favours and how clear that is, what the spread between the top three means for confidence, and the single assumption most likely to break the call. Do not re-list the table.`,
-    maxTokens: 260,
-  });
+  // Keyed on the board, not just the round: once qualifying lands the ranking
+  // changes, and a read written on the old grid must not describe the new one.
+  return memoRead(
+    `predict:v3:${prediction.race.round}:${prediction.weekend.quali}:${top[0]?.code ?? "none"}`,
+    async () => {
+      const completion = await aiText({
+        system: VOICE,
+        user: `DATA\n${data}\n\nTASK\nWrite the desk's read on this forecast: who the model favours and how clear that is, what the spread between the top three means for confidence, and the single assumption most likely to break the call. Do not re-list the table.`,
+        maxTokens: 260,
+      });
 
-  return asRead(completion, fallback);
-  });
+      return asRead(completion, fallback);
+    },
+  );
 }
 
 /** Extra analysis on a completed race, on top of the template debrief. */

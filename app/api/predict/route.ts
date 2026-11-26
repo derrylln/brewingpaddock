@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { predictionRead } from "@/lib/ai-reads";
 import type { AiRead } from "@/lib/ai";
 import { papersNotes, type PapersNotes } from "@/lib/papers-notes";
-import { buildPrediction, type Prediction } from "@/lib/predict";
+import { buildPrediction, weekendQualiReady, type Prediction } from "@/lib/predict";
 import { savePrediction } from "@/lib/pre-race-log";
 import { LIMITS, guard, withGuardHeaders } from "@/lib/rate-limit";
 
@@ -11,8 +11,9 @@ export const dynamic = "force-dynamic";
 type Payload = Prediction & { read: AiRead; notes: PapersNotes };
 
 // The forecast rebuilds the season archive and runs 4,000 simulations, and its
-// written read costs money, so both are held per isolate for ten minutes.
-const TTL_MS = 10 * 60 * 1000;
+// written read costs money, so both are held per isolate. The hold never
+// outlives the grid it was built on: see the check below.
+const TTL_MS = 5 * 60 * 1000;
 let cached: { at: number; payload: Payload } | null = null;
 
 export async function GET(request: Request) {
@@ -22,7 +23,11 @@ export async function GET(request: Request) {
   if (!hourly.ok) return hourly.response;
 
   if (cached && Date.now() - cached.at < TTL_MS) {
-    return withGuardHeaders(NextResponse.json(cached.payload), gate);
+    // A board built before Saturday cannot survive the session it waits for.
+    // Once this weekend's qualifying lands, drop the held copy and simulate
+    // again on the real grid — no visitor action needed.
+    const qualiLanded = await weekendQualiReady(cached.payload).catch(() => false);
+    if (!qualiLanded) return withGuardHeaders(NextResponse.json(cached.payload), gate);
   }
 
   try {

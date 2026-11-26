@@ -4,6 +4,7 @@ import {
   getSeasonOverview,
   getSeasonResults,
   isFinisher,
+  raceStart,
   type Race,
 } from "@/lib/f1";
 import { teamColour, teamName } from "@/lib/teams";
@@ -45,6 +46,8 @@ export type Prediction = {
     date: string;
     /** Scheduled start, used to freeze the call before the lights go out. */
     time?: string;
+    /** Scheduled qualifying start, so the board knows when its grid input is due. */
+    qualiAt?: string;
   };
   rows: PredictionRow[];
   sims: number;
@@ -89,6 +92,18 @@ function stdev(values: number[]): number {
 
 export const WEIGHTS = { quali: 0.28, form: 0.36, team: 0.14, consistency: 0.12, champ: 0.1 };
 export const W_RECENCY = [0.1, 0.15, 0.2, 0.25, 0.3];
+
+/**
+ * True once this weekend's qualifying has landed upstream. A board built before
+ * the session is stale the moment the grid is set, so callers holding one ask
+ * this before serving it again.
+ */
+export async function weekendQualiReady(prediction: Prediction): Promise<boolean> {
+  if (prediction.weekend.quali === "this-weekend") return false;
+  if (!prediction.race.round) return false;
+  const quali = await getQualifying(prediction.season, prediction.race.round);
+  return quali.length > 0;
+}
 
 /** Build a score in 0..1 for every driver, then simulate the race 4,000 times. */
 export async function buildPrediction(): Promise<Prediction> {
@@ -312,6 +327,10 @@ export async function buildPrediction(): Promise<Prediction> {
       country: race?.Circuit.Location.country ?? "—",
       date: race?.date ?? "",
       time: race?.time,
+      qualiAt:
+        race?.Qualifying?.date && race.Qualifying.time
+          ? raceStart(race.Qualifying).toISOString()
+          : undefined,
     },
     rows,
     sims,

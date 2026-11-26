@@ -152,8 +152,9 @@ A round counts as completed from its **scheduled start plus a race window**, not
 from its calendar date, so a race that ran on today's date is scored the same
 day. The same start-time rule decides `nextRace`: once the lights go out, `/strategy`
 and `/predict` roll on to the next weekend on their own (the calendar is cached
-for ten minutes, so a new visitor gets the new race within that window; a tab
-left open keeps its old payload until reload).
+for ten minutes, so a new visitor gets the new race within that window;
+`/strategy` keeps its old payload until reload, while `/predict` polls — see
+[Predictor](#predictor)).
 
 ## Predictor
 
@@ -169,6 +170,24 @@ and `savePrediction`, so rounds called after this shipped are marked `saved` and
 cannot be rewritten by a retune. Older rounds are `replay`: the five factors are
 run on the data available at the time — every round before the target, with that
 race's grid standing in for a qualifying session the archive does not keep.
+
+**The board rebuilds itself once qualifying lands.** Qualifying pace is 28% of the
+score, so a ranking simulated on last round's grid is wrong the moment this
+weekend's session ends — a pole-sitter is not still the favourite because the
+model never saw them qualify. Three things keep it current, none of them needing
+a visitor to reload:
+
+- `/api/predict` holds its payload for five minutes per instance, but checks
+  `weekendQualiReady` first: if this weekend's qualifying has landed upstream
+  since the board was built, the held copy is dropped and the race is simulated
+  again on the real grid. The frozen pre-race log is untouched — it is the call
+  that was made, not a live number.
+- The written read is memoised on the board it describes (round, qualifying
+  source and top driver), not on the round alone, so the narrative is rewritten
+  rather than left describing the pre-qualifying order.
+- `/predict` polls itself: every minute from five minutes before the scheduled
+  session until the grid is in, and every ten minutes otherwise. A failed
+  refresh never replaces a board already on screen.
 
 ## Instagram feed
 
@@ -265,9 +284,9 @@ to narrate it has been removed along with `POST /api/ai/telemetry`.
 Where it plugs in:
 
 - `POST /api/ai/strategy/forecast` — rebuilds the race forecast from the calendar, then reads it.
-- `GET /api/predict` — adds `read` and the papers' per-driver `notes` to the forecast payload, cached ten
-  minutes per instance. The notes are a follow-up on the papers' finished readings, pinned to
-  `gemini-3.1-flash-lite`.
+- `GET /api/predict` — adds `read` and the papers' per-driver `notes` to the forecast payload, cached five
+  minutes per instance (and dropped early once this weekend's qualifying lands). The notes are a
+  follow-up on the papers' finished readings, pinned to `gemini-3.1-flash-lite`.
 - `/race/[round]` — extra analysis on the latest round only, so the archive costs nothing.
 
 Without a key, or if a call fails or the budget is spent, each surface falls back to the computed

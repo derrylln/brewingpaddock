@@ -11,6 +11,22 @@ function pct(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
+const MINUTE = 60_000;
+
+/**
+ * How long to wait before asking the model again.
+ *
+ * Around the qualifying session the board is about to change, so it is checked
+ * every minute from five minutes before the session until the grid has landed.
+ * The rest of the weekend it is checked at the pace the forecast rebuilds.
+ */
+function nextDelay(qualiAt: string | undefined, onThisWeekend: boolean): number {
+  if (onThisWeekend) return 10 * MINUTE;
+  const start = qualiAt ? Date.parse(qualiAt) : Number.NaN;
+  if (Number.isFinite(start) && Date.now() >= start - 5 * MINUTE) return MINUTE;
+  return 10 * MINUTE;
+}
+
 export default function Predictor() {
   const [data, setData] = useState<(Prediction & { read?: AiRead; notes?: PapersNotes }) | null>(
     null,
@@ -19,15 +35,37 @@ export default function Predictor() {
 
   useEffect(() => {
     let alive = true;
-    fetch("/api/predict")
-      .then((res) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let loaded = false;
+
+    const tick = async () => {
+      try {
+        const res = await fetch("/api/predict", { cache: "no-store" });
         if (!res.ok) throw new Error("The model could not load the season data.");
-        return res.json() as Promise<Prediction & { read?: AiRead; notes?: PapersNotes }>;
-      })
-      .then((payload) => alive && setData(payload))
-      .catch((err: Error) => alive && setError(err.message));
+        const payload = (await res.json()) as Prediction & {
+          read?: AiRead;
+          notes?: PapersNotes;
+        };
+        if (!alive) return;
+        loaded = true;
+        setData(payload);
+        setError(null);
+        timer = setTimeout(
+          tick,
+          nextDelay(payload.race.qualiAt, payload.weekend.quali === "this-weekend"),
+        );
+      } catch (err) {
+        if (!alive) return;
+        // A refresh that fails never throws away a board already on screen.
+        if (!loaded) setError((err as Error).message);
+        timer = setTimeout(tick, MINUTE);
+      }
+    };
+
+    void tick();
     return () => {
       alive = false;
+      if (timer) clearTimeout(timer);
     };
   }, []);
 
