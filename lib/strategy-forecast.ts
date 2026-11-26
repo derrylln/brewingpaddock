@@ -293,14 +293,24 @@ const STARTS: Array<{ compound: Compound; weight: number }> = [
 
 type Sample = { option: StrategyOption; scenario: Scenario; start: Compound };
 
+/** Whether three stops are physically on the table at this circuit: the hardest
+ *  dry tyre cannot cover the race in two stints. Read off the profile, so the
+ *  plan set follows abrasion instead of a hand-written list of circuits. */
+function hardLifePlausible(profile: CircuitProfile, totalLaps: number): boolean {
+  return (profile.minStops ?? 0) < 3 && tyreLife("hard", profile.abrasion) * 1.15 < totalLaps;
+}
+
 function planShapes(
   totalLaps: number,
   minStops = 0,
+  abrasion = 1,
 ): Array<Array<{ lap: number; compound: Compound }>> {
   const plans: Array<Array<{ lap: number; compound: Compound }>> = [];
   const dry: Compound[] = ["soft", "medium", "hard"];
   const firstWindow = { from: Math.round(totalLaps * 0.18), to: Math.round(totalLaps * 0.72) };
-  const secondWindow = { from: Math.round(totalLaps * 0.42), to: Math.round(totalLaps * 0.85) };
+  // Opened up from 42%: a two-stop race can put its first stop a third of the
+  // way in, and the old floor made that shape unpricable.
+  const secondWindow = { from: Math.round(totalLaps * 0.28), to: Math.round(totalLaps * 0.85) };
 
   // A circuit can rule a plan out entirely. Qatar is a two-stop race, so no
   // single-stop shape is even priced there: it would win on paper and lose to
@@ -325,6 +335,34 @@ function planShapes(
       }
     }
   }
+
+  // A three-stop race is not an odd call on a high-abrasion circuit; it is the
+  // only way the stints fit. This is read off the tyre life rather than listed
+  // per circuit, so a profile that says "the hard cannot go two thirds of the
+  // race" automatically unlocks the shapes that admit it. The first window
+  // opens early because that is where those stops actually fall.
+  const hardLife = tyreLife("hard", abrasion);
+  if (minStops < 3 && hardLife * 1.15 < totalLaps) {
+    const sequences: Compound[][] = [
+      ["medium", "soft", "medium"],
+      ["soft", "medium", "soft"],
+      ["medium", "hard", "medium"],
+      ["soft", "medium", "hard"],
+    ];
+    for (const sequence of sequences) {
+      for (let a = Math.round(totalLaps * 0.1); a <= Math.round(totalLaps * 0.42); a += 5) {
+        for (let b = a + 8; b <= Math.round(totalLaps * 0.7); b += 6) {
+          for (let c = b + 8; c <= Math.round(totalLaps * 0.93); c += 8) {
+            plans.push([
+              { lap: a, compound: sequence[0] },
+              { lap: b, compound: sequence[1] },
+              { lap: c, compound: sequence[2] },
+            ]);
+          }
+        }
+      }
+    }
+  }
   return plans;
 }
 
@@ -345,7 +383,7 @@ export function forecastRace(race: ForecastRace): StrategyForecast {
   const profile = profileFor(race.circuit, race.laps || 57, race.circuitName);
   const totalLaps = profile.laps;
   const minStops = profile.minStops ?? 0;
-  const plans = planShapes(totalLaps, minStops);
+  const plans = planShapes(totalLaps, minStops, profile.abrasion);
   const scenarios = scenariosFor(profile, race.circuit);
 
   const groups = new Map<
@@ -465,6 +503,9 @@ export function forecastRace(race: ForecastRace): StrategyForecast {
         .join(", ")}, weighted by the circuit's degradation pressure (abrasion ${profile.abrasion.toFixed(
         2,
       )}).`,
+      hardLifePlausible(profile, totalLaps)
+        ? `Three-stop plans are priced too: at ${profile.name} the hard tyre lasts ${tyreLife("hard", profile.abrasion)} laps, so the race does not fit two stints.`
+        : `Two-stop and one-stop plans only: at ${profile.name} the hard tyre lasts ${tyreLife("hard", profile.abrasion)} laps, enough for the distance in two stints.`,
       `Tyre life follows that abrasion: at ${profile.name} the soft lasts ${tyreLife(
         "soft",
         profile.abrasion,

@@ -96,7 +96,7 @@ function snapshotPits(season: number, round: number): PitStop[] {
 /** The current model's call, cached for the afternoon: it is only used to fill gaps. */
 function replayCall(season: number, race: Race): Promise<PredictedCall | null> {
   return cached(
-    `forecast:round:${season}:${race.round}:${race.date}`,
+    `forecast:round:v2:${season}:${race.round}:${race.date}`,
     6 * 60 * 60_000,
     async (): Promise<PredictedCall | null> => {
       const forecast = forecastRace(

@@ -76,7 +76,7 @@ Retry, and the first paint can always fall back to the bundled
 ## Strategist
 
 `/strategy` opens with a pre-weekend forecast for the next race: every sensible
-plan shape (one stop, two stops, which compounds) is priced across five weighted
+plan shape (one, two or three stops, and which compounds) is priced across five weighted
 scenarios — three track temperatures plus safety-car variants — and the winners
 are grouped into the percentages shown. `GET /api/strategy/forecast` builds it
 from the calendar; `POST /api/ai/strategy/forecast` adds the desk's read. The
@@ -96,6 +96,12 @@ The weights are set by late-race conditions, not a flat average
   circuit shifts weight towards the hot-track outcomes, where fresh rubber late
   is worth more; a low-abrasion one shifts it towards the cool, track-position
   races.
+- **Three-stop plans appear when the tyre life demands them.** `planShapes`
+  prices a three-stop grid only when the hardest dry tyre cannot cover the race
+  in two stints (`tyreLife("hard", abrasion) * 1.15 < laps`), so a high-abrasion
+  circuit can express the shapes the field actually runs while a one-stop race
+  is not buried in plans that cannot win. The grid reads the profile, so a
+  corrected abrasion unlocks the shapes on its own.
 - **Tyre life scales with abrasion, not just the rate of loss.** `tyreLife` in
   `lib/strategy.ts` divides the base life by the circuit's abrasion, so a soft
   lasts 32 laps at Monaco and 14 at Lusail, and the total drop at the cliff stays
