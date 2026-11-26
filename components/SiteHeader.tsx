@@ -11,6 +11,7 @@ const NAV = [
   { href: "/telemetry", label: "Telemetry" },
   { href: "/strategy", label: "Strategist" },
   { href: "/predict", label: "Predictor" },
+  { href: "/papers", label: "Papers" },
   { href: "/ask", label: "Ask" },
 ];
 

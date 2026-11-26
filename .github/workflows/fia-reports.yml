@@ -1,0 +1,48 @@
+name: FIA papers
+
+# One ingest + one model pass a day. The result is committed, so the site never
+# calls a model when somebody opens the page, and a deploy is triggered by the
+# data change itself.
+on:
+  schedule:
+    - cron: "20 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fia-papers
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Read the FIA documents
+        run: npm run reports:sync
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
+
+      - name: Commit new papers
+        run: |
+          if git diff --quiet -- data/fia-reports.json; then
+            echo "No new documents today."
+            exit 0
+          fi
+          git config user.name "brewing-paddock-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/fia-reports.json
+          git commit -m "Read the FIA papers for the next race."
+          git push

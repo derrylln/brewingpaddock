@@ -260,6 +260,35 @@ read and labels itself `model only` rather than erroring. Generation is throttle
 deployment's R2 bucket rather than isolate memory, so a public link cannot spend the owner's
 credits without bound.
 
+## The FIA papers
+
+`/papers` turns the FIA's race-weekend paperwork into something readable: upgrades, power-unit
+declarations, summons, penalties and classifications, each summarised and linked to the official PDF.
+
+The FIA has no API, so `scripts/fia-reports.mjs` reads the server-rendered document list for the next
+event (`fia.com/documents/decision-documents/event/<Event Name>`), downloads the PDFs and extracts
+their text with `unpdf`. One model call then classifies the whole batch and writes
+`data/fia-reports.json`; without a key, the same file is produced by title-and-text rules tagged
+`rules`, so the page never depends on the model being available.
+
+The `.github/workflows/fia-reports.yml` action runs it once a day (and on demand) and commits the
+JSON. That is the whole cost model: **one model pass per day, saved to the repo** — opening or
+refreshing the page never calls a model. Set the `GEMINI_API_KEY` repository secret to turn the
+model read on; `AI_MODEL` is optional. Run it locally with `npm run reports:sync`, or pin an event
+with `FIA_EVENT="Las Vegas Grand Prix" npm run reports:sync`.
+
+Once the key exists, every document still carrying a `rules` reading is re-read — including the
+previous round's archive, so turning the key on upgrades the backlog without a manual step. The
+batch is chunked (six documents or ~11k characters per request), each chunk is retried across
+models, and any document the model leaves out gets its own retry. If a chunk still fails, or a
+document remains unclassified, the script exits non-zero and **does not write the file**, so the
+action fails instead of quietly committing a weekend of rule readings. `AI_ATTEMPTS` overrides the
+per-call attempt count (default 3). PDF downloads back off and retry on 429/5xx; a document whose
+PDF cannot be fetched at all is still classified from its title, with a warning in the log.
+
+The papers annotate the race; they are deliberately not an input to the forecast or predictor
+numbers. `npm run build` imports the committed JSON directly, so the page is static.
+
 ## Deploying to your own Cloudflare account
 
 The repo is wired for Cloudflare **Workers Builds** (Git integration): push to `main` and Cloudflare

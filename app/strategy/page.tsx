@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ForecastRecordPanel from "@/components/ForecastRecordPanel";
+import PapersNote from "@/components/PapersNote";
 import StrategyForecastPanel from "@/components/StrategyForecastPanel";
 
 export const metadata: Metadata = {
@@ -26,6 +27,7 @@ export default function StrategyPage() {
             was made and scored against the pit log, with older rounds replayed and labelled as such.
           </p>
         </header>
+        <PapersNote />
         <StrategyForecastPanel />
         <ForecastRecordPanel />
       </div>
