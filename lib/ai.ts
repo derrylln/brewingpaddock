@@ -29,10 +29,12 @@ const DEFAULT_BASE = "https://generativelanguage.googleapis.com/v1beta/openai";
 // gemini-2.5-flash is deprecated and re-routes after 1 December 2026, so the
 // default is a current model, with a cheaper sibling as the fallback.
 const DEFAULT_MODEL = "gemini-3.5-flash-lite";
-// Ordered cheapest-capable first. `gemini-3.5-flash` is routinely 503 under load
-// and `gemini-3.8-flash` has answered with a gateway timeout, so the list is a
-// real failover path, not decoration.
-const FALLBACK_MODELS = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+// Ordered cheapest-capable first, and only free-tier-eligible models.
+// `gemini-3.5-flash` is not in the free tier — the API answers it with a
+// `429 limit: 0` on a free key — and the endpoint re-routes it to 3.6-flash
+// anyway, so it was a guaranteed dead link that cost a round trip per request.
+// Flash-Lite gets the largest free allowance (15 RPM / 500 RPD).
+const FALLBACK_MODELS = ["gemini-3.1-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"];
 /** Per-attempt cap, so a stalled model still leaves time for the next one. */
 const TIMEOUT_MS = 9_000;
 /** Statuses that mean "try again elsewhere", not "this key cannot do it". */
@@ -196,15 +198,16 @@ export async function aiText(request: {
           return { text: roomier.text, model };
         }
         console.error(`[ai] ${model} response truncated past ${cap * 2} tokens`);
-        return null;
+        continue;
       }
 
       console.error(`[ai] ${model} ${res.status} ${res.detail ?? "empty response"}`);
 
       // Overload, gateway timeouts and rate limits are model- or shard-specific,
-      // so the next model is worth a try. Auth, quota and billing errors are not:
-      // they would fail identically everywhere.
-      if (RETRYABLE.has(res.status) || res.status === 404) continue;
+      // so the next model is worth a try, as is a 200 that came back with no
+      // usable text. Auth, quota and billing errors are not: they would fail
+      // identically everywhere.
+      if (res.status === 200 || RETRYABLE.has(res.status) || res.status === 404) continue;
       return null;
     } catch (error) {
       // A timeout or connection drop is the same story: try the next model.

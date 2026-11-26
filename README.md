@@ -247,11 +247,17 @@ not applied to an existing deployment):
 
 Requests use Gemini's OpenAI-compatible chat-completions endpoint with a Bearer key, so any other
 OpenAI-compatible endpoint works too (`https://api.openai.com/v1`, OpenRouter, Groq, …). `gemini-2.5-flash`
-is deprecated and re-routes after 1 December 2026. The default is `gemini-3.5-flash-lite`, because the
-bigger sibling spends time answering `503 high demand` (and `gemini-3.8-flash` returned a gateway
-timeout while this was written). The client fails over on 408/429/5xx and timeouts, and gives up
-immediately on auth or billing errors, which would fail the same way on every model. Each read is
-memoised in the shared data cache for fifteen minutes, so a repeat view costs no model call.
+is deprecated and re-routes after 1 December 2026. The default is `gemini-3.5-flash-lite`; the failover
+chain behind it is `gemini-3.1-flash-lite` → `gemini-3.6-flash` → `gemini-3.8-flash`. Only models with a
+free tier are listed: `gemini-3.5-flash` is *not* free-tier eligible (the API answers `429` with
+`limit: 0`) and the endpoint re-routes it to `gemini-3.6-flash` anyway, so it was a dead link in the
+chain. Flash-Lite carries the largest free allowance (15 RPM, 500 requests a day). The client fails
+over on 408/429/5xx, timeouts, 404s and empty or truncated replies; it gives up immediately on auth
+or billing errors, which would fail the same way on every model. A fallback is visible in the
+deployment logs as `[ai] <model> <status>`.
+
+Each read is memoised in the shared data cache for fifteen minutes, so a repeat view costs no model
+call — and a model tag you see on screen can be up to fifteen minutes old.
 
 Telemetry has no model call at all: the chart is the explanation, and the panel that asked the model
 to narrate it has been removed along with `POST /api/ai/telemetry`.

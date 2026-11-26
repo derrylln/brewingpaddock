@@ -363,7 +363,10 @@ Rules:
 - "read" is 2-3 sentences on what the paperwork means for the race: who brings performance, who is likely to take a grid penalty, what the stewards are watching. Use only the supplied documents; never invent a team, number or penalty.
 - "teams" lists at most 6 constructors with a one-line note, most consequential first. Use [] when nothing stands out.`;
 
-const MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite"];
+// Free-tier-eligible models only: `gemini-3.5-flash` has no free quota (429
+// limit: 0) and re-routes to 3.6-flash, so it never answered and only cost a
+// round trip per call. Flash-Lite carries the largest free allowance.
+const MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"];
 const CHUNK_DOCS = 6;
 const CHUNK_CHARS = 11_000;
 
