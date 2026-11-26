@@ -96,6 +96,13 @@ The weights are set by late-race conditions, not a flat average
   circuit shifts weight towards the hot-track outcomes, where fresh rubber late
   is worth more; a low-abrasion one shifts it towards the cool, track-position
   races.
+- **Track position is priced against a second car.** `neutralTimeline` in
+  `lib/strategy.ts` runs a rival that stops where the tyre life says a sensible
+  car stops, and every lap a plan spends behind it is charged at the circuit's
+  cost of following (0.12s a lap where passing is easy, 0.55s at Monaco and
+  Suzuka). Without that rival the optimiser only sees clean air, which is why it
+  always picked the late, balanced split; with it, stopping early to get out of
+  traffic is worth something. The forecast names the rate it used.
 - **Three-stop plans appear when the tyre life demands them.** `planShapes`
   prices a three-stop grid only when the hardest dry tyre cannot cover the race
   in two stints (`tyreLife("hard", abrasion) * 1.15 < laps`), so a high-abrasion

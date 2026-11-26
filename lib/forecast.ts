@@ -9,7 +9,7 @@ import { circuitForRace, forecastRace } from "@/lib/strategy-forecast";
  */
 export async function getNextForecast() {
   return cached(
-    "forecast:next:v5",
+    "forecast:next:v6",
     10 * 60_000,
     async () => {
       const overview = await getSeasonOverview();

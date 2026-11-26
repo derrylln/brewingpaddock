@@ -1,5 +1,6 @@
 import {
   CIRCUITS,
+  DIRTY_AIR,
   pricePlanOn,
   tyreLife,
   type CircuitKey,
@@ -513,6 +514,7 @@ export function forecastRace(race: ForecastRace): StrategyForecast {
         "medium",
         profile.abrasion,
       )} and the hard ${tyreLife("hard", profile.abrasion)}.`,
+      `Every plan is priced against a neutral car that stops where the tyre life says it should: laps spent behind it are charged at ${DIRTY_AIR[profile.overtaking].toFixed(2)}s a lap, the circuit's cost of following, so the model sees the undercut instead of only the clean-air optimum.`,
       `Safety car priced at ${Math.round(scProb * 100)}% for ${profile.name}: ${Math.round(
         scProb * (1 - lateShare) * 100,
       )}% in the third quarter and ${Math.round(

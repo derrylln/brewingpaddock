@@ -363,6 +363,48 @@ export type StrategyResult = {
   undercut: string;
 };
 
+/** What a lap spent stuck behind a car costs, by how hard passing is. */
+export const DIRTY_AIR: Record<CircuitProfile["overtaking"], number> = {
+  easy: 0.12,
+  medium: 0.3,
+  hard: 0.55,
+};
+
+/** The neutral car's stops: evenly spaced, as many as the tyre life forces. */
+function neutralStops(circuit: CircuitProfile, totalLaps: number): number[] {
+  const natural =
+    circuit.minStops ?? (tyreLife("hard", circuit.abrasion) * 1.15 < totalLaps ? 2 : 1);
+  const count = Math.max(1, natural);
+  return Array.from({ length: count }, (_, index) =>
+    Math.round(((index + 1) * totalLaps) / (count + 1)),
+  );
+}
+
+/** Cumulative race time of the neutral car, lap by lap from the same start.
+ *
+ *  This is the other half of an undercut: without a rival, an extra second of
+ *  clean air is worth nothing, so the optimiser always takes the balanced split.
+ *  The rival stops where the tyre life says a sensible car stops, and every lap
+ *  our plan spends behind it is charged at the circuit's cost of following. */
+function neutralTimeline(circuit: CircuitProfile, input: StrategyInput): number[] {
+  const stops = new Map(neutralStops(circuit, input.totalLaps).map((lap) => [lap, "medium" as Compound]));
+  const timeline: number[] = [];
+  let cumulative = 0;
+  let compound: Compound = input.compound === "inter" || input.compound === "wet" ? input.compound : "medium";
+  let age = 0;
+  for (let lap = input.lap; lap <= input.totalLaps; lap += 1) {
+    if (stops.has(lap) && lap > 1) {
+      cumulative += circuit.pitLoss;
+      compound = stops.get(lap) as Compound;
+      age = 0;
+    }
+    cumulative += lapTime(circuit, compound, age, input.trackTemp, input.rain);
+    age += 1;
+    timeline.push(cumulative);
+  }
+  return timeline;
+}
+
 type Plan = { stops: Array<{ lap: number; compound: Compound }> };
 
 function simulate(input: StrategyInput, circuit: CircuitProfile, plan: Plan): StrategyOption {
@@ -373,6 +415,7 @@ function simulate(input: StrategyInput, circuit: CircuitProfile, plan: Plan): St
   let age = input.tyreAge;
   let stintStart = Math.max(1, input.lap - input.tyreAge);
   let stopsDone = 0;
+  const perLap: number[] = [];
   const pitLaps = new Map(plan.stops.map((stop) => [stop.lap, stop.compound]));
   const window = input.safetyCarWindow;
   // A forecasted safety car is only cheap while it is actually out; the lab's
@@ -405,8 +448,25 @@ function simulate(input: StrategyInput, circuit: CircuitProfile, plan: Plan): St
     }
     total += lapTime(circuit, compound, age, input.trackTemp, input.rain);
     age += 1;
+    perLap.push(total);
   }
   stints.push({ compound, fromLap: stintStart, toLap: input.totalLaps });
+
+  // Two-car undercut: pay for the laps spent in the dirty air of the neutral
+  // car. A plan that stops early gets clean air; a plan that waits inherits the
+  // traffic it rejoins into, which is the cost a one-car model cannot see.
+  const rival = neutralTimeline(circuit, input);
+  let behindLaps = 0;
+  for (let index = 0; index < perLap.length; index += 1) {
+    if (perLap[index] > rival[index] + 0.5) behindLaps += 1;
+  }
+  const trafficCost = behindLaps * DIRTY_AIR[circuit.overtaking];
+  if (trafficCost >= 0.5) {
+    total += trafficCost;
+    notes.push(
+      `Track position: ${behindLaps} laps in the dirty air of the neutral car, charged at ${DIRTY_AIR[circuit.overtaking].toFixed(2)}s a lap because passing is ${circuit.overtaking} here.`,
+    );
+  }
 
   const finalCompound = stints[stints.length - 1].compound;
   // Every stint is checked, not just the last one. A first stint 8 laps past the

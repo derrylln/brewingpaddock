@@ -98,7 +98,7 @@ function snapshotPits(season: number, round: number): PitStop[] {
 /** The current model's call, cached for the afternoon: it is only used to fill gaps. */
 function replayCall(season: number, race: Race): Promise<PredictedCall | null> {
   return cached(
-    `forecast:round:v2:${season}:${race.round}:${race.date}`,
+    `forecast:round:v3:${season}:${race.round}:${race.date}`,
     6 * 60 * 60_000,
     async (): Promise<PredictedCall | null> => {
       const forecast = forecastRace(
@@ -126,7 +126,7 @@ function replayCall(season: number, race: Race): Promise<PredictedCall | null> {
 }
 
 export function getForecastRecord(): Promise<ForecastRecord> {
-  return cached("forecast:record:v2", 30 * 60_000, async () => {
+  return cached("forecast:record:v3", 30 * 60_000, async () => {
     const season = await resolveSeason();
     const [schedule, log] = await Promise.all([getSchedule(season), readForecastLog(season)]);
 
