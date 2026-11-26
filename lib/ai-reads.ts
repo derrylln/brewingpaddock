@@ -1,6 +1,5 @@
 import { aiEnabled, aiText, type AiCompletion, type AiRead } from "@/lib/ai";
 import { cached } from "@/lib/cache";
-import type { AskAnswer } from "@/lib/knowledge";
 import type { Prediction } from "@/lib/predict";
 import type { StrategyForecast } from "@/lib/strategy-forecast";
 
@@ -34,16 +33,6 @@ function pct(value: number): string {
  */
 function memoRead(key: string, produce: () => Promise<AiRead>): Promise<AiRead> {
   return cached(`ai:${key}`, 15 * 60_000, produce);
-}
-
-/** Questions repeat verbatim far more often than scenarios do. */
-function memoQuestion(
-  question: string,
-  _base: AskAnswer,
-  produce: () => Promise<AiRead | null>,
-): Promise<AiRead | null> {
-  const key = `ai:ask:${question.trim().toLowerCase().slice(0, 160)}`;
-  return cached<AiRead | null>(key, 30 * 60_000, produce);
 }
 
 function asRead(completion: AiCompletion | null, fallback: string): AiRead {
@@ -126,39 +115,6 @@ export async function debriefRead(
   return completion
     ? { text: completion.text, source: "ai", model: completion.model }
     : null;
-}
-
-/** Natural-language rendering of an already grounded, source-cited answer. */
-export async function polishAnswer(question: string, base: AskAnswer): Promise<AiRead | null> {
-  if (!aiEnabled()) return null;
-
-  const data = [
-    `Question: ${question}`,
-    `Grounded answer: ${base.answer}`,
-    base.bullets?.length ? `Supporting points: ${base.bullets.join(" | ")}` : "",
-    base.table
-      ? `Table already shown under the answer: ${base.table.columns.join(", ")} — rows: ${base.table.rows
-          .map((row) => row.join(" / "))
-          .join(" | ")}`
-      : "",
-    `Sources: ${base.citations.join("; ")}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  return memoQuestion(question, base, async () => {
-  const completion = await aiText({
-    system: `${VOICE}
-You are answering a reader's question directly in the desk's voice. Never mention models, retrieval or databases. Keep every number identical to the grounded answer and never contradict it. If the grounded answer says the data does not cover the question, say that in one sentence.`,
-    user: `DATA\n${data}\n\nTASK\nAnswer the question in one to three sentences using only this data. No preamble, no restating of the question, no table.`,
-    maxTokens: 180,
-    temperature: 0.25,
-  });
-
-  return completion
-    ? { text: completion.text, source: "ai", model: completion.model }
-    : null;
-  });
 }
 
 /** Read on the pre-weekend race-plan forecast. */

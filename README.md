@@ -1,7 +1,7 @@
 # Brewing Paddock
 
 F1 news desk and race-data workbench: live standings, every 2026 classification, OpenF1 telemetry,
-a stint simulator, a Monte Carlo predictor and a grounded race assistant.
+a stint simulator, a Monte Carlo predictor and the FIA's paperwork decoded.
 
 ## Run
 
@@ -264,9 +264,10 @@ to narrate it has been removed along with `POST /api/ai/telemetry`.
 
 Where it plugs in:
 
-- `POST /api/ask` — retrieval answers first, the model rephrases (grounded, same numbers).
 - `POST /api/ai/strategy/forecast` — rebuilds the race forecast from the calendar, then reads it.
-- `GET /api/predict` — adds `read` to the forecast payload, cached ten minutes per instance.
+- `GET /api/predict` — adds `read` and the papers' per-driver `notes` to the forecast payload, cached ten
+  minutes per instance. The notes are a follow-up on the papers' finished readings, pinned to
+  `gemini-3.1-flash-lite`.
 - `/race/[round]` — extra analysis on the latest round only, so the archive costs nothing.
 
 Without a key, or if a call fails or the budget is spent, each surface falls back to the computed
@@ -313,7 +314,11 @@ per-call attempt count (default 3). PDF downloads back off and retry on 429/5xx;
 PDF cannot be fetched at all is still classified from its title, with a warning in the log.
 
 The papers annotate the race; they are deliberately not an input to the forecast or predictor
-numbers. `npm run build` imports the committed JSON directly, so the page is static.
+numbers. `/predict` reads them the other way round: every driver whose team has an upgrade, a
+power-unit change or a penalty in this event's paperwork gets a one-line FYI under their row in the
+win-probability list. That is a single follow-up call (`gemini-3.1-flash-lite`, memoised fifteen
+minutes) over the finished readings — it never re-reads the PDFs and never moves the probabilities.
+`npm run build` imports the committed JSON directly, so the papers page is static.
 
 ## Deploying to Vercel
 
@@ -324,8 +329,9 @@ Pushing to `main` deploys, and no Cloudflare credentials exist in this repositor
    preset is detected as Next.js; build command `npm run build`, install `npm install`, output
    `.next`. Nothing else needs overriding.
 2. **Project → Settings → Environment Variables**, ticked for Production **and** Preview:
-   - `GEMINI_API_KEY` — turns the written analysis and the assistant's rephrasing on. Without it the
-     site still runs; each panel shows the computed read tagged `model only`.
+   - `GEMINI_API_KEY` — turns the written analysis and the papers' FYI follow-up on. Without it the
+     site still runs; each panel shows the computed read tagged `model only`, and the FYIs quote the
+     papers' own wording.
    - `AI_MODEL` — optional. Leave it unset for `gemini-3.5-flash-lite`.
    - `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` — **Storage → Marketplace → Upstash for
      Redis** (free tier), connected to the project; the integration writes these names, or the

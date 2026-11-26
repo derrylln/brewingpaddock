@@ -158,6 +158,8 @@ export async function aiText(request: {
   user: string;
   maxTokens?: number;
   temperature?: number;
+  /** Pin this call to a specific model first (the fallback chain still follows). */
+  model?: string;
 }): Promise<AiCompletion | null> {
   const key = apiKey();
   if (!key) return null;
@@ -174,7 +176,7 @@ export async function aiText(request: {
   const gemini = isGemini(base);
   const cap = gemini ? req.maxTokens + THINKING_HEADROOM : req.maxTokens;
   const reasoning = gemini ? "minimal" : null;
-  const models = [...new Set([aiModel(), ...FALLBACK_MODELS])];
+  const models = [...new Set([request.model?.trim() || aiModel(), ...FALLBACK_MODELS])];
 
   for (const model of models) {
     try {

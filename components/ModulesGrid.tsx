@@ -30,14 +30,6 @@ export default function ModulesGrid({ latestRound }: { latestRound?: number }) {
     },
     {
       index: "03",
-      href: "/ask",
-      title: "Ask Paddock",
-      description:
-        "A chatbot that only answers what the data can back up — standings, archives, sector times, rules.",
-      meta: "Retrieval · cited",
-    },
-    {
-      index: "04",
       href: "/predict",
       title: "Race Predictor",
       description:
@@ -45,7 +37,7 @@ export default function ModulesGrid({ latestRound }: { latestRound?: number }) {
       meta: "Monte Carlo · seeded",
     },
     {
-      index: "05",
+      index: "04",
       href: latestRound ? `/race/${latestRound}` : "/news",
       title: "Auto Debrief",
       description:

@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { predictionRead } from "@/lib/ai-reads";
 import type { AiRead } from "@/lib/ai";
+import { papersNotes, type PapersNotes } from "@/lib/papers-notes";
 import { buildPrediction, type Prediction } from "@/lib/predict";
 import { savePrediction } from "@/lib/pre-race-log";
 import { LIMITS, guard, withGuardHeaders } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-type Payload = Prediction & { read: AiRead };
+type Payload = Prediction & { read: AiRead; notes: PapersNotes };
 
 // The forecast rebuilds the season archive and runs 4,000 simulations, and its
 // written read costs money, so both are held per isolate for ten minutes.
@@ -32,8 +33,13 @@ export async function GET(request: Request) {
       console.warn("[predict] could not freeze the ranking", error);
       return null;
     });
-    const read = await predictionRead(prediction);
-    const payload: Payload = { ...prediction, read };
+    // The papers' FYI lines ride along with the read: both are one model call
+    // behind a ten-minute cache, and neither touches the simulated numbers.
+    const [read, notes] = await Promise.all([
+      predictionRead(prediction),
+      papersNotes(prediction),
+    ]);
+    const payload: Payload = { ...prediction, read, notes };
     cached = { at: Date.now(), payload };
     return withGuardHeaders(NextResponse.json(payload), gate);
   } catch {

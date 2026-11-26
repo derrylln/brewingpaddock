@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AiReadText from "@/components/AiReadText";
 import type { AiRead } from "@/lib/ai";
+import type { PapersNotes } from "@/lib/papers-notes";
 import type { Prediction } from "@/lib/predict";
 import { raceDay } from "@/lib/format";
 
@@ -11,7 +12,9 @@ function pct(value: number): string {
 }
 
 export default function Predictor() {
-  const [data, setData] = useState<(Prediction & { read?: AiRead }) | null>(null);
+  const [data, setData] = useState<(Prediction & { read?: AiRead; notes?: PapersNotes }) | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -19,7 +22,7 @@ export default function Predictor() {
     fetch("/api/predict")
       .then((res) => {
         if (!res.ok) throw new Error("The model could not load the season data.");
-        return res.json() as Promise<Prediction & { read?: AiRead }>;
+        return res.json() as Promise<Prediction & { read?: AiRead; notes?: PapersNotes }>;
       })
       .then((payload) => alive && setData(payload))
       .catch((err: Error) => alive && setError(err.message));
@@ -52,6 +55,8 @@ export default function Predictor() {
   const top = data.rows.slice(0, 10);
   const podium = data.rows.slice(0, 3);
   const maxWin = Math.max(...data.rows.map((row) => row.win), 0.01);
+  // Papers-first notes: only drivers whose weekend paperwork the desk has read.
+  const fyi = new Map((data.notes?.items ?? []).map((note) => [note.code, note]));
 
   return (
     <div className="predict">
@@ -133,9 +138,31 @@ export default function Predictor() {
               <span className="mono prob-value">{pct(row.win)}</span>
               <span className="mono prob-extra">P3 {pct(row.podium)}</span>
               <span className="mono prob-extra">P10 {pct(row.points)}</span>
+              {fyi.has(row.code) ? (
+                <p className="prob-fyi">
+                  <span
+                    className="mono prob-fyi-tag"
+                    title={
+                      fyi.get(row.code)?.source === "ai"
+                        ? `Read from this weekend's FIA papers by ${fyi.get(row.code)?.model}`
+                        : "From this weekend's FIA papers"
+                    }
+                  >
+                    FYI
+                  </span>
+                  <span>{fyi.get(row.code)?.text}</span>
+                </p>
+              ) : null}
             </div>
           ))}
         </div>
+        {fyi.size > 0 ? (
+          <p className="factor-note">
+            The FYI lines come from this weekend&apos;s FIA papers, read by the desk and followed up
+            by {data.notes?.model ?? "the model"}. They annotate the grid — they are not an input to
+            the simulation.
+          </p>
+        ) : null}
       </div>
 
       <div className="predict-split">
@@ -222,8 +249,9 @@ export default function Predictor() {
         <p className="mono kicker-red">Read this before you bet the farm</p>
         <p>
           This is a statistical model built on public classification data, not a prediction of what
-          will happen. It knows nothing about upgrades arriving at the track, weather, penalties or a
-          first-lap incident. Use it to understand the shape of the grid, then watch the race.
+          will happen. Its numbers know nothing about upgrades arriving at the track, weather,
+          penalties or a first-lap incident — the FYI lines carry the paperwork, but they never move
+          the probabilities. Use it to understand the shape of the grid, then watch the race.
         </p>
       </div>
     </div>

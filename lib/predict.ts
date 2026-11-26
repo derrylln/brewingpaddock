@@ -15,6 +15,8 @@ export type PredictionRow = {
   code: string;
   name: string;
   team: string;
+  /** Stable constructor id, so other modules can match a driver to their team. */
+  teamId: string;
   colour: string;
   score: number;
   win: number;
@@ -229,6 +231,7 @@ export async function buildPrediction(): Promise<Prediction> {
       code,
       name: `${driver.givenName} ${driver.familyName}`,
       team: teamName(entry.constructor.constructorId, entry.constructor.name),
+      teamId: entry.constructor.constructorId,
       colour: teamColour(entry.constructor.constructorId),
       score,
       win: 0,

@@ -12,7 +12,6 @@ const NAV = [
   { href: "/strategy", label: "Strategist" },
   { href: "/predict", label: "Predictor" },
   { href: "/papers", label: "Papers" },
-  { href: "/ask", label: "Ask" },
 ];
 
 export default function SiteHeader() {

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     template: "%s · Brewing Paddock",
   },
   description:
-    "Live F1 news aggregation, telemetry comparison, an AI race strategist, a seeded race predictor and a grounded paddock chatbot. Every lap, every rumour, one desk.",
+    "Live F1 news aggregation, telemetry comparison, an AI race strategist, a seeded race predictor and the FIA's paperwork decoded. Every lap, every rumour, one desk.",
   applicationName: "Brewing Paddock",
 };
 

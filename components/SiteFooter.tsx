@@ -8,8 +8,8 @@ export default function SiteFooter() {
           <p className="serif footer-script">Brewed by Brewing Paddock</p>
           <p className="footer-copy">
             A pit-wall desk for people who read the timing screens for fun. Live results and
-            standings, telemetry, strategy calls and a chat that only answers what the data can
-            back up.
+            standings, telemetry, strategy calls, a simulated grid and the FIA&apos;s paperwork
+            decoded.
           </p>
           <p className="footer-fine">
             Independent fan project. Not affiliated with Formula 1, the FIA or any team.
@@ -22,7 +22,7 @@ export default function SiteFooter() {
           <Link href="/telemetry">Telemetry</Link>
           <Link href="/strategy">Race strategist</Link>
           <Link href="/predict">Predictor</Link>
-          <Link href="/ask">Ask Paddock</Link>
+          <Link href="/papers">The papers</Link>
         </div>
 
         <div className="footer-col">

@@ -190,30 +190,13 @@ export default async function HomePage() {
 
       <section className="section" id="tools">
         <div className="shell">
-          <SectionHead index="03" title="The pit wall" kicker="Five tools, no paywall">
+          <SectionHead index="03" title="The pit wall" kicker="Four tools, no paywall">
             <span className="mono section-note">Modelled on live season data</span>
           </SectionHead>
           <ModulesGrid latestRound={lastRace ? Number(lastRace.round) : undefined} />
         </div>
       </section>
 
-      <section className="section section-tight" id="ask">
-        <div className="shell cta-band">
-          <div>
-            <p className="mono kicker-red">Ask Paddock</p>
-            <h2 className="cta-title">
-              Who had the fastest sector 2 in Brazil? <em>Just ask.</em>
-            </h2>
-            <p className="cta-copy">
-              A chatbot wired to the live championship, every 2026 classification, the telemetry
-              archive and the rulebook digest. Every answer cites its source.
-            </p>
-          </div>
-          <Link className="btn btn-primary" href="/ask">
-            Open the chat
-          </Link>
-        </div>
-      </section>
     </>
   );
 }
