@@ -255,8 +255,10 @@ Where it plugs in:
 - `/race/[round]` — extra analysis on the latest round only, so the archive costs nothing.
 
 Without a key, or if a call fails or the budget is spent, each surface falls back to the computed
-read and labels itself `model only` rather than erroring. Generation is capped per worker instance
-(20/minute, 240/hour) so a public link cannot spend the owner's credits without bound.
+read and labels itself `model only` rather than erroring. Generation is throttled per visitor
+(6/minute and 30/hour) and for the site as a whole (12/minute and 120/hour), counted in the
+deployment's R2 bucket rather than isolate memory, so a public link cannot spend the owner's
+credits without bound.
 
 ## Deploying to your own Cloudflare account
 

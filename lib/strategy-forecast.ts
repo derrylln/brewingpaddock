@@ -474,8 +474,8 @@ export function forecastRace(race: ForecastRace): StrategyForecast {
   const lateShare = 0.72;
   const call = favourite
     ? `${favourite.label} leads the forecast at ${Math.round(favourite.probability * 100)}% across ${
-        scenarios.length
-      } weather and safety-car scenarios${
+        scenarios.length * STARTS.length
+      } weather, safety-car and starting-tyre scenarios${
         favourite.stops === 0
           ? ", with no stop priced"
           : favourite.stops === 1

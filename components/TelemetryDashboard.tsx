@@ -399,7 +399,7 @@ export default function TelemetryDashboard() {
               <div className="driver-card-meta mono">
                 <span>Lap {driver.lapNumber}</span>
                 <span>{driver.team}</span>
-                <span>{isFaster ? "+0.000 faster" : fmtGap(comparison.lapDelta)}</span>
+                <span>{isFaster ? "+0.000 faster" : fmtGap(Math.abs(comparison.lapDelta))}</span>
               </div>
               <div className="sector-grid">
                 {driver.sectors.map((sector, index) => {

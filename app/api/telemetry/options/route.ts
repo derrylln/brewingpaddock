@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
  * `?session=KEY` returns the drivers in that session and the laps each one set;
  * without it, the sessions a visitor can choose from.
  *
- * Both lists are cached for 15–30 minutes (memory + Workers Cache API), so a
- * session switch normally costs zero upstream calls.
+ * Both lists are cached for 15–30 minutes (isolate memory + the Next data cache
+ * on R2), so a session switch normally costs zero upstream calls.
  */
 export async function GET(request: Request) {
   const gate = await guard(request, "telemetry", LIMITS.telemetry.limit, LIMITS.telemetry.windowMs);
