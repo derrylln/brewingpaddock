@@ -167,10 +167,6 @@ export default function StrategyForecastPanel() {
             {forecast.assumptions.map((line) => (
               <li key={line}>{line}</li>
             ))}
-            <li>
-              Plans are grouped by shape — one stop, medium to hard — so the percentage is the share
-              of scenarios that pick that shape, not a bookmaker&apos;s price.
-            </li>
           </ul>
         </div>
       </div>

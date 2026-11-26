@@ -503,26 +503,24 @@ export function forecastRace(race: ForecastRace): StrategyForecast {
         .map((scenario) => `${scenario.trackTemp}°C`)
         .join(", ")}, weighted by the circuit's degradation pressure (abrasion ${profile.abrasion.toFixed(
         2,
-      )}).`,
-      hardLifePlausible(profile, totalLaps)
-        ? `Three-stop plans are priced too: at ${profile.name} the hard tyre lasts ${tyreLife("hard", profile.abrasion)} laps, so the race does not fit two stints.`
-        : `Two-stop and one-stop plans only: at ${profile.name} the hard tyre lasts ${tyreLife("hard", profile.abrasion)} laps, enough for the distance in two stints.`,
-      `Tyre life follows that abrasion: at ${profile.name} the soft lasts ${tyreLife(
+      )}). At ${profile.name} the soft lasts ${tyreLife(
         "soft",
         profile.abrasion,
       )} laps to the cliff, the medium ${tyreLife(
         "medium",
         profile.abrasion,
-      )} and the hard ${tyreLife("hard", profile.abrasion)}.`,
-      `Every plan is priced against a neutral car that stops where the tyre life says it should: laps spent behind it are charged at ${DIRTY_AIR[profile.overtaking].toFixed(2)}s a lap, the circuit's cost of following, so the model sees the undercut instead of only the clean-air optimum.`,
-      `Safety car priced at ${Math.round(scProb * 100)}% for ${profile.name}: ${Math.round(
+      )} and the hard ${tyreLife("hard", profile.abrasion)}, ${
+        hardLifePlausible(profile, totalLaps)
+          ? "so three-stop plans are priced as well."
+          : "enough for the distance in two stints, so one- and two-stop plans only."
+      }`,
+      `Track position is priced: every plan runs against a neutral car that stops where the tyre life says it should, and laps spent behind it cost ${DIRTY_AIR[profile.overtaking].toFixed(2)}s each, so the model sees the undercut instead of only the clean-air optimum.`,
+      `Safety car priced at ${Math.round(scProb * 100)}% for ${profile.name} — ${Math.round(
         scProb * (1 - lateShare) * 100,
       )}% in the third quarter and ${Math.round(
         scProb * lateShare * 100,
-      )}% in the final quarter, not on lap one.`,
-      "Dry running only: this is the baseline plan, not a wet-race call.",
-      "A stop inside a safety-car window is priced at roughly 40% of a green-flag pit loss.",
-      "Percentages are weighted scenario wins, so the plan with the fastest single projection is not always the favourite.",
+      )}% in the final quarter, never lap one — and a stop inside that window costs roughly 40% of a green-flag pit loss.`,
+      "Dry running only, so this is the baseline plan rather than a wet-race call. Percentages are the share of scenarios that pick a plan shape (one, two or three stops), not a bookmaker's price.",
     ],
     call,
   };
