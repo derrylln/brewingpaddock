@@ -66,11 +66,8 @@ export default function Predictor() {
             {data.weekend.quali === "this-weekend"
               ? "Qualifying: this weekend"
               : data.weekend.quali === "previous-round"
-                ? "Qualifying: last round, this weekend&apos;s not run"
+                ? "Qualifying: last round, this weekend's not run"
                 : "Qualifying: none available"}
-            {data.weekend.practice
-              ? ` · Practice: ${data.weekend.practice}`
-              : " · Practice: none yet"}
           </p>
         </div>
         <div className="predict-meta">

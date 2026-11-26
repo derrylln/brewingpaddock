@@ -4,10 +4,8 @@ import {
   getSeasonOverview,
   getSeasonResults,
   isFinisher,
-  raceStart,
   type Race,
 } from "@/lib/f1";
-import { getWeekendPace } from "@/lib/openf1";
 import { teamColour, teamName } from "@/lib/teams";
 import { codeOf, rankFromHistory } from "@/lib/walk-forward";
 
@@ -51,11 +49,9 @@ export type Prediction = {
   backtest: Backtest | null;
   method: string[];
   dataPoints: number;
-  /** Which sessions fed the pace factor, so the board can say what it used. */
+  /** Which qualifying session fed the pace factor, so the board can say what it used. */
   weekend: {
     quali: "this-weekend" | "previous-round" | "none";
-    practice: string | null;
-    practiceDrivers: number;
   };
 };
 
@@ -91,8 +87,6 @@ function stdev(values: number[]): number {
 
 export const WEIGHTS = { quali: 0.28, form: 0.36, team: 0.14, consistency: 0.12, champ: 0.1 };
 export const W_RECENCY = [0.1, 0.15, 0.2, 0.25, 0.3];
-/** How close to lights-out a meeting has to be before practice pace is fetched. */
-const WEEKEND_WINDOW_MS = 6 * 24 * 60 * 60 * 1000;
 
 /** Build a score in 0..1 for every driver, then simulate the race 4,000 times. */
 export async function buildPrediction(): Promise<Prediction> {
@@ -100,20 +94,10 @@ export async function buildPrediction(): Promise<Prediction> {
   const season = overview.season;
   const race: Race | null = overview.nextRace ?? overview.lastRace;
 
-  // Practice data is a round trip to OpenF1, so it is only worth asking for in
-  // the days before the race — the rest of the season keeps the cheap path.
-  const weekendSoon = race ? raceStart(race).getTime() - Date.now() < WEEKEND_WINDOW_MS : false;
-
-  const [seasonResults, constructors, targetQuali, practice] = await Promise.all([
+  const [seasonResults, constructors, targetQuali] = await Promise.all([
     getSeasonResults(season),
     getConstructorStandings(season),
     race ? getQualifying(season, race.round) : Promise.resolve([]),
-    weekendSoon && race
-      ? getWeekendPace({
-          date: race.date,
-          country: race.Circuit.Location.country,
-        }).catch(() => null)
-      : Promise.resolve(null),
   ]);
 
   // This weekend's qualifying beats last round's once it has run; the previous
@@ -221,19 +205,10 @@ export async function buildPrediction(): Promise<Prediction> {
 
     const code = driver.code ?? driver.familyName.slice(0, 3).toUpperCase();
 
-    // Qualifying pace: rolling grid average, plus the latest session, plus this
-    // weekend's practice long runs when OpenF1 has them. The weights follow what
-    // is actually available — a session from last round carries less than fresh
-    // data, and practice takes over part of its share when that is all there is.
+    // Qualifying pace: a rolling grid average plus the latest session available.
     const rollingQuali = Math.min(1, Math.max(0, (21 - weightedGrid) / 20));
     const latestQuali = latestQualiMap.get(driver.driverId) ?? rollingQuali;
-    const practiceScore = practice?.pace[code] ?? null;
-    const qualiScore =
-      practiceScore === null
-        ? rollingQuali * 0.6 + latestQuali * 0.4
-        : qualiFromThisWeekend
-          ? rollingQuali * 0.35 + latestQuali * 0.4 + practiceScore * 0.25
-          : rollingQuali * 0.45 + latestQuali * 0.2 + practiceScore * 0.35;
+    const qualiScore = rollingQuali * 0.6 + latestQuali * 0.4;
 
     const champ = 1 - (entry.position - 1) / Math.max(1, standings.length - 1);
     const consistency = Math.exp(-stdev(last5) / 4.5);
@@ -341,8 +316,6 @@ export async function buildPrediction(): Promise<Prediction> {
     dataPoints,
     weekend: {
       quali: qualiSource,
-      practice: practice ? practice.session : null,
-      practiceDrivers: practice ? practice.drivers : 0,
     },
     method: [
       `Scored ${rows.length} drivers across five weighted factors.`,
@@ -353,11 +326,7 @@ export async function buildPrediction(): Promise<Prediction> {
           : qualiSource === "previous-round"
             ? "the last completed round's qualifying, because this weekend's has not run"
             : "rolling grids only, with no qualifying session available"
-      }${
-        practice
-          ? `, blended with ${practice.session} long-run pace for ${practice.drivers} drivers.`
-          : ". No practice session was available to blend in."
-      }`,
+      }.`,
       `Simulated ${sims.toLocaleString("en-GB")} seeded races with Gumbel noise and per-driver DNF risk.`,
       "No finishing position is ever guaranteed — probabilities, not predictions of fact.",
     ],

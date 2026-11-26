@@ -84,15 +84,6 @@ export type DriverOption = {
   laps: LapOption[];
 };
 
-/** Long-run pace from a practice session, scored 0..1 against the session best. */
-export type WeekendPace = {
-  session: string;
-  sessionKey: number;
-  date: string;
-  pace: Record<string, number>;
-  drivers: number;
-};
-
 async function of1<T>(path: string, timeout = 9000, attempts = 1): Promise<T | null> {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
@@ -347,101 +338,6 @@ async function carTrace(
   } catch {
     return null;
   }
-}
-
-const PRACTICE_SESSIONS = ["Practice 1", "Practice 2", "Practice 3"];
-
-/**
- * Practice long-run pace for a race meeting, from the latest practice session
- * that has run. Best effort: no meeting in the window, a throttled session or
- * too few clean laps all return null, and the predictor keeps its quantified
- * form. Keyed by driver acronym so it joins the classification rows directly.
- */
-export async function getWeekendPace(meeting: {
-  date: string;
-  country: string;
-}): Promise<WeekendPace | null> {
-  if (!meeting.date) return null;
-
-  return cached(
-    `openf1:practice:${meeting.date}:${meeting.country}`,
-    TTL.laps,
-    async (): Promise<WeekendPace | null> => {
-      const sessions = await rawSessions();
-      const day = Date.parse(`${meeting.date}T00:00:00Z`);
-      if (!Number.isFinite(day)) return null;
-
-      // The meeting runs in the days before the race; five days covers a
-      // Thursday start at a flyaway without reaching the previous round.
-      const candidates = sessions
-        .filter((session) => PRACTICE_SESSIONS.includes(session.session_name))
-        .filter((session) => {
-          const start = Date.parse(session.date_start);
-          return (
-            Number.isFinite(start) &&
-            start <= day + 86_400_000 &&
-            start >= day - 5 * 86_400_000
-          );
-        });
-      const circuits = new Set(candidates.map((session) => session.circuit_short_name));
-      const wanted = candidates.filter((session) =>
-        session.country_name.toLowerCase().includes(meeting.country.toLowerCase().slice(0, 5)),
-      );
-      const pool = wanted.length > 0 ? wanted : circuits.size === 1 ? candidates : [];
-      const session = pool.sort(
-        (a, b) => Date.parse(b.date_start) - Date.parse(a.date_start),
-      )[0];
-      if (!session) return null;
-
-      const [laps, drivers] = await Promise.all([
-        sessionLaps(session.session_key),
-        sessionDrivers(session.session_key),
-      ]);
-      if (!laps || !drivers) return null;
-
-      const byDriver = new Map<number, number[]>();
-      for (const lap of laps) {
-        if (!usableLap(lap)) continue;
-        const list = byDriver.get(lap.driver_number) ?? [];
-        list.push(lap.lap_duration as number);
-        byDriver.set(lap.driver_number, list);
-      }
-
-      // Long-run pace: strip the traffic and cool-down laps that sit far off a
-      // driver's own best, then take the median of what is left. A single best
-      // lap would just re-measure qualifying.
-      const longRuns = new Map<number, number>();
-      for (const [number, times] of byDriver) {
-        if (times.length < 3) continue;
-        const best = Math.min(...times);
-        const clean = times.filter((time) => time <= best * 1.07).sort((a, b) => a - b);
-        if (clean.length === 0) continue;
-        const mid = Math.floor(clean.length / 2);
-        longRuns.set(
-          number,
-          clean.length % 2 === 0 ? (clean[mid - 1] + clean[mid]) / 2 : clean[mid],
-        );
-      }
-      if (longRuns.size < 10) return null;
-
-      const reference = Math.min(...longRuns.values());
-      const pace: Record<string, number> = {};
-      for (const driver of drivers) {
-        const time = longRuns.get(driver.driver_number);
-        if (time === undefined) continue;
-        pace[driver.name_acronym] = Math.max(0, Math.min(1, Math.exp(-(time - reference) / 1.2)));
-      }
-      if (Object.keys(pace).length < 10) return null;
-
-      return {
-        session: session.session_name,
-        sessionKey: session.session_key,
-        date: session.date_start,
-        pace,
-        drivers: Object.keys(pace).length,
-      };
-    },
-  );
 }
 
 /** The pair a visitor asked for, by session + driver + lap. */
