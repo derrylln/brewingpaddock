@@ -2661,7 +2661,6 @@ select.input {
   color: var(--ink-2);
   font-size: 15px;
   line-height: 1.6;
-  max-width: 780px;
 }
 
 .debrief-stats {
@@ -2692,10 +2691,6 @@ select.input {
 .debrief-stat-note {
   color: var(--faint);
   font-size: 10.5px;
-}
-
-.debrief-body {
-  max-width: 780px;
 }
 
 .debrief-body p {
