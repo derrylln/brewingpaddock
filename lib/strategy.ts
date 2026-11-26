@@ -355,14 +355,6 @@ export type StrategyOption = {
   notes: string[];
 };
 
-export type StrategyResult = {
-  options: StrategyOption[];
-  baseline: number;
-  call: string;
-  transcript: Array<{ role: "engineer" | "driver"; text: string }>;
-  undercut: string;
-};
-
 /** What a lap spent stuck behind a car costs, by how hard passing is. */
 export const DIRTY_AIR: Record<CircuitProfile["overtaking"], number> = {
   easy: 0.12,
@@ -418,8 +410,8 @@ function simulate(input: StrategyInput, circuit: CircuitProfile, plan: Plan): St
   const perLap: number[] = [];
   const pitLaps = new Map(plan.stops.map((stop) => [stop.lap, stop.compound]));
   const window = input.safetyCarWindow;
-  // A forecasted safety car is only cheap while it is actually out; the lab's
-  // "safety car now" still covers the next few laps from the current one.
+  // A forecasted safety car is only cheap while it is actually out; a flag on
+  // track right now still covers the next few laps from the current one.
   const cheapStop = (lap: number) =>
     window
       ? lap >= window.from && lap <= window.to
@@ -528,94 +520,6 @@ function simulate(input: StrategyInput, circuit: CircuitProfile, plan: Plan): St
     risk,
     notes,
   };
-}
-
-export function buildStrategies(input: StrategyInput): StrategyResult {
-  const circuit = CIRCUITS[input.circuit];
-  const totalLaps = Math.max(input.lap + 1, Math.min(input.totalLaps, circuit.laps));
-  const merged: StrategyInput = { ...input, totalLaps };
-
-  const minStops = circuit.minStops ?? 0;
-  const plans: Plan[] = [{ stops: [] }];
-  const compounds: Compound[] =
-    input.rain === "heavy" ? ["wet", "inter"] : input.rain === "light" ? ["inter", "wet", "medium"] : input.rain === "drying" ? ["medium", "inter", "soft"] : ["medium", "hard", "soft"];
-  const horizon = Math.min(totalLaps - 2, input.lap + 30);
-
-  for (const compound of compounds) {
-    for (let lap = input.lap + 1; lap <= horizon; lap += 2) {
-      plans.push({ stops: [{ lap, compound }] });
-    }
-  }
-  if (input.rain !== "heavy") {
-    for (let first = input.lap + 2; first <= horizon; first += 4) {
-      for (let second = first + 8; second <= totalLaps - 2; second += 6) {
-        plans.push({
-          stops: [
-            { lap: first, compound: input.rain === "dry" ? "medium" : "inter" },
-            { lap: second, compound: input.rain === "dry" ? "soft" : "wet" },
-          ],
-        });
-      }
-    }
-  }
-
-  // A circuit that forces two stops rules the shorter plans out. Late enough in
-  // the race there may be no legal two-stop window left; then the plan list is
-  // still priced rather than coming back empty.
-  const feasible = plans.filter((plan) => plan.stops.length >= minStops);
-  const options = (feasible.length > 0 ? feasible : plans)
-    .map((plan) => simulate(merged, circuit, plan))
-    .sort((a, b) => a.totalTime - b.totalTime)
-    .slice(0, 12);
-
-  const best = options[0];
-  options.forEach((option) => {
-    option.delta = option.totalTime - best.totalTime;
-  });
-  const baseline = simulate(merged, circuit, { stops: [] });
-  const improvement = baseline.totalTime - best.totalTime;
-
-  const undercut =
-    input.gapAhead < 1.5 && !input.safetyCar
-      ? `You are ${input.gapAhead.toFixed(1)}s behind the car ahead — inside undercut range.`
-      : input.gapAhead < 3
-        ? "The car ahead is close enough to cover a reactive stop."
-        : "The car ahead is out of range; this is a free-strategy call.";
-
-  const noWindow =
-    minStops > 0 && feasible.length === 0
-      ? ` ${circuit.name} requires at least ${minStops} stops over the race distance, and from lap ${input.lap} there is no window left for another.`
-      : "";
-  const call =
-    best.stops === 0
-      ? `No further stop is priceable from lap ${input.lap}.${noWindow} Extend the ${meta(
-          input.compound,
-        ).label.toLowerCase()} to the flag and manage the rear.`
-      : `${best.label}. ${
-          minStops > 0
-            ? `${circuit.name} forces at least ${minStops} stops, so shorter plans are not priced`
-            : improvement >= 0
-              ? `Projects ${improvement.toFixed(1)}s ahead of not stopping again, risk included`
-              : `Only ${Math.abs(improvement).toFixed(1)}s worse than not stopping, so it is a defensive move`
-        } with a ${best.risk} risk profile.`;
-
-  const transcript: Array<{ role: "engineer" | "driver"; text: string }> = [
-    {
-      role: "engineer",
-      text: `Lap ${input.lap} of ${totalLaps}, ${meta(input.compound).label.toLowerCase()} on lap ${input.tyreAge}. ${input.safetyCar ? "Safety car is out." : `Gap ahead ${input.gapAhead.toFixed(1)}s, behind ${input.gapBehind.toFixed(1)}s.`}`,
-    },
-    {
-      role: "driver",
-      text: input.tyreAge > 15 ? "Rear is starting to go away. The traction is falling off." : "Tyres are still underneath me — happy to stay out.",
-    },
-    { role: "engineer", text: call },
-    {
-      role: "driver",
-      text: best.stops > 0 ? `Understood. Box on lap ${best.stops > 0 ? best.stints[0].toLap + 1 : "—"}.` : "Understood. Staying out.",
-    },
-  ];
-
-  return { options, baseline: baseline.totalTime, call, transcript, undercut };
 }
 
 /** Price one explicit pit plan. Used by the race forecast, which enumerates

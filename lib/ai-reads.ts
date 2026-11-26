@@ -2,7 +2,6 @@ import { aiEnabled, aiText, type AiCompletion, type AiRead } from "@/lib/ai";
 import { cached } from "@/lib/cache";
 import type { AskAnswer } from "@/lib/knowledge";
 import type { Prediction } from "@/lib/predict";
-import type { StrategyInput, StrategyResult } from "@/lib/strategy";
 import type { StrategyForecast } from "@/lib/strategy-forecast";
 
 /**
@@ -91,47 +90,6 @@ export async function predictionRead(prediction: Prediction): Promise<AiRead> {
     system: VOICE,
     user: `DATA\n${data}\n\nTASK\nWrite the desk's read on this forecast: who the model favours and how clear that is, what the spread between the top three means for confidence, and the single assumption most likely to break the call. Do not re-list the table.`,
     maxTokens: 260,
-  });
-
-  return asRead(completion, fallback);
-  });
-}
-
-/** Pit-wall read on a simulated strategy call. */
-export async function strategyRead(input: StrategyInput, result: StrategyResult): Promise<AiRead> {
-  const best = result.options[0];
-  const gain = result.baseline - best.totalTime;
-  const fallback = `${result.call} Projected ${Math.abs(gain).toFixed(1)}s ${
-    gain >= 0 ? "better" : "worse"
-  } than staying out to the flag, at ${best.risk} risk.`;
-
-  const alternatives = result.options
-    .slice(1, 5)
-    .map(
-      (option) =>
-        `- ${option.label}: ${option.stops} stop(s), +${option.delta.toFixed(1)}s versus the best plan, ${option.risk} risk.`,
-    )
-    .join("\n");
-
-  const data = [
-    `Scenario: lap ${input.lap} of ${input.totalLaps}, on ${input.compound} tyres with ${input.tyreAge} laps on them.`,
-    `Gap ahead ${input.gapAhead}s, gap behind ${input.gapBehind}s. Track temperature ${input.trackTemp}°C, conditions ${input.rain}${input.safetyCar ? ", safety car deployed" : ""}.`,
-    `Recommended plan: ${best.label} — ${best.stops} stop(s), ${best.risk} risk, ${
-      gain >= 0 ? "−" : "+"
-    }${Math.abs(gain).toFixed(1)}s versus no further stop, projected total ${best.totalTime.toFixed(1)}s.`,
-    best.notes.length ? `Model notes: ${best.notes.join(" ")}` : "",
-    alternatives ? `Alternatives:\n${alternatives}` : "",
-    `Model summary: ${result.call}`,
-    `Undercut: ${result.undercut}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  return memoRead(`strategy:${JSON.stringify(input)}`, async () => {
-  const completion = await aiText({
-    system: VOICE,
-    user: `DATA\n${data}\n\nTASK\nGive the pit-wall read on this call: why it wins, what it costs in track position or tyre life, and the one trigger that should change it. Do not repeat the option table.`,
-    maxTokens: 240,
   });
 
   return asRead(completion, fallback);
