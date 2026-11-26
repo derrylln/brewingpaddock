@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AiReadText from "@/components/AiReadText";
 import type { AiRead } from "@/lib/ai";
 import type { Prediction } from "@/lib/predict";
 import { raceDay } from "@/lib/format";
@@ -100,7 +101,7 @@ export default function Predictor() {
               {data.read.source === "ai" ? `AI · ${data.read.model}` : "model only"}
             </span>
           </div>
-          <p className="ai-read">{data.read.text}</p>
+          <AiReadText text={data.read.text} />
         </div>
       ) : null}
 

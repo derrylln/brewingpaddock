@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AiReadText from "@/components/AiReadText";
 import type { AiRead } from "@/lib/ai";
 import type { StrategyForecast } from "@/lib/strategy-forecast";
 
@@ -147,11 +148,13 @@ export default function StrategyForecastPanel() {
               {read?.source === "ai" ? `AI · ${read.model}` : "model only"}
             </span>
           </div>
-          <p className="ai-read">
-            {read
-              ? read.text
-              : "Ask for the pre-weekend read: why the model likes the front-running plan, what the alternatives give up, and the one race event that would flip it."}
-          </p>
+          <AiReadText
+            text={
+              read
+                ? read.text
+                : "Ask for the pre-weekend read: why the model likes the front-running plan, what the alternatives give up, and the one race event that would flip it."
+            }
+          />
           {readError ? <p className="ai-error mono">{readError}</p> : null}
           <button type="button" className="btn btn-ghost ai-btn" onClick={askDesk} disabled={reading}>
             {reading ? "Reading the forecast…" : read ? "Read it again" : "Ask the desk"}

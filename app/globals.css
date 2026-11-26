@@ -3175,6 +3175,12 @@ select.input {
   margin: 0;
   color: var(--ink-2);
   line-height: 1.65;
+  display: grid;
+  gap: 10px;
+}
+
+.ai-panel .ai-read p {
+  margin: 0;
 }
 
 .ai-tag {

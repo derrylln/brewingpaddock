@@ -94,6 +94,18 @@ async function withinBudget(): Promise<boolean> {
   return hour.ok;
 }
 
+/**
+ * Collapse the spacing inside each paragraph but keep the breaks between them,
+ * so a two-paragraph read still reads as two paragraphs in the UI.
+ */
+function normaliseText(raw: string): string {
+  return raw
+    .split(/\r?\n[ \t]*\r?\n+/)
+    .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 type Attempt = { ok: boolean; status: number; text?: string; truncated?: boolean; detail?: string };
 
 async function attempt(
@@ -134,7 +146,7 @@ async function attempt(
     choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
   };
   const choice = data.choices?.[0];
-  const text = (choice?.message?.content ?? "").replace(/\s+/g, " ").trim();
+  const text = normaliseText(choice?.message?.content ?? "");
   if (text.length <= 24) return { ok: false, status: res.status };
   return { ok: true, status: res.status, text, truncated: choice?.finish_reason === "length" };
 }

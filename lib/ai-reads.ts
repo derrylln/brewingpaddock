@@ -85,7 +85,7 @@ export async function predictionRead(prediction: Prediction): Promise<AiRead> {
     ),
   ].join("\n");
 
-  return memoRead(`predict:${prediction.race.round}`, async () => {
+  return memoRead(`predict:v2:${prediction.race.round}`, async () => {
   const completion = await aiText({
     system: VOICE,
     user: `DATA\n${data}\n\nTASK\nWrite the desk's read on this forecast: who the model favours and how clear that is, what the spread between the top three means for confidence, and the single assumption most likely to break the call. Do not re-list the table.`,
@@ -177,7 +177,7 @@ export async function forecastRead(forecast: StrategyForecast): Promise<AiRead> 
     ),
   ].join("\n");
 
-  return memoRead(`forecast:${forecast.race.round}`, async () => {
+  return memoRead(`forecast:v2:${forecast.race.round}`, async () => {
     const completion = await aiText({
       system: VOICE,
       user: `DATA\n${data}\n\nTASK\nWrite the pre-weekend strategy read: what the most likely plan is and why the tyre model likes it, how much the alternatives give up, and the single race event most likely to flip the call. Do not restate the percentages table.`,
