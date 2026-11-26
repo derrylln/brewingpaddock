@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { redisCommands, redisConfig, type RedisConfig } from "@/lib/redis";
+
 /**
  * Light per-visitor throttle.
  *
@@ -14,9 +16,7 @@ import { NextResponse } from "next/server";
  * Counters must live outside the instance: requests land on fresh instances, so
  * an in-memory bucket never accumulates and a "limit" that never fires is worse
  * than none. On Vercel the store is Upstash Redis over its REST API
- * (`UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`; the Vercel integration's
- * `KV_REST_API_URL` + `KV_REST_API_TOKEN` are accepted too), counted with a
- * fixed window of INCR against a key that carries its own TTL.
+ * (`lib/redis.ts`), counting each window with a single pipelined call.
  *
  * On Cloudflare Workers the older R2 binding (`NEXT_INC_CACHE_R2_BUCKET`) is
  * still used when present, so a self-hosted Workers deploy keeps working. With
@@ -28,14 +28,12 @@ type R2Like = {
   get(key: string): Promise<{ json(): Promise<unknown> } | null>;
   put(key: string, value: string): Promise<unknown>;
 };
-type Store = { kind: "redis"; url: string; token: string } | { kind: "r2"; bucket: R2Like };
+type Store = { kind: "redis"; config: RedisConfig } | { kind: "r2"; bucket: R2Like };
 
 const memory = new Map<string, Bucket>();
 const COOKIE = "bp-vid";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 const KEY_PREFIX = "bp-ratelimit";
-/** Redis calls are on the request path; do not let a slow store hold it open. */
-const REDIS_TIMEOUT_MS = 2_500;
 let lastSweep = Date.now();
 let resolvedStore: Store | null | undefined;
 
@@ -49,21 +47,12 @@ function sweep(now: number): void {
   }
 }
 
-function env(...names: string[]): string {
-  for (const name of names) {
-    const value = (process.env[name] ?? "").trim();
-    if (value) return value;
-  }
-  return "";
-}
-
 async function store(): Promise<Store | null> {
   if (resolvedStore !== undefined) return resolvedStore;
 
-  const url = env("UPSTASH_REDIS_REST_URL", "KV_REST_API_URL");
-  const token = env("UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN");
-  if (url && token) {
-    resolvedStore = { kind: "redis", url: url.replace(/\/+$/, ""), token };
+  const config = redisConfig();
+  if (config) {
+    resolvedStore = { kind: "redis", config };
     return resolvedStore;
   }
 
@@ -90,28 +79,14 @@ async function store(): Promise<Store | null> {
  * than sliding — a visitor hammering the endpoint still gets a fresh allowance
  * when the window ends instead of being locked out forever.
  */
-async function redisCount(store: { url: string; token: string }, key: string, windowMs: number) {
-  const res = await fetch(`${store.url}/pipeline`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${store.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify([
-      ["SET", key, 0, "PX", windowMs, "NX"],
-      ["INCR", key],
-      ["PTTL", key],
-    ]),
-    signal: AbortSignal.timeout(REDIS_TIMEOUT_MS),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`upstash ${res.status}`);
-  const data = (await res.json()) as Array<{ result?: unknown; error?: string }>;
-  if (!Array.isArray(data) || data.some((entry) => entry?.error)) {
-    throw new Error("upstash pipeline rejected the counters");
-  }
-  const count = Number(data[1]?.result);
-  const ttl = Number(data[2]?.result);
+async function redisCount(config: RedisConfig, key: string, windowMs: number) {
+  const [, rawCount, rawTtl] = await redisCommands(config, [
+    ["SET", key, 0, "PX", windowMs, "NX"],
+    ["INCR", key],
+    ["PTTL", key],
+  ]);
+  const count = Number(rawCount);
+  const ttl = Number(rawTtl);
   if (!Number.isFinite(count) || count < 1) throw new Error("upstash returned no counter");
   return { count, ttl: Number.isFinite(ttl) && ttl > 0 ? ttl : windowMs };
 }
@@ -198,7 +173,7 @@ export async function rateLimit(
 
   if (durable?.kind === "redis") {
     try {
-      const { count, ttl } = await redisCount(durable, `${KEY_PREFIX}:${key}`, windowMs);
+      const { count, ttl } = await redisCount(durable.config, `${KEY_PREFIX}:${key}`, windowMs);
       if (count > limit) {
         return { ok: false, retryAfter: Math.max(1, Math.ceil(ttl / 1000)) };
       }

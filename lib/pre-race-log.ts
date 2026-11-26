@@ -1,4 +1,5 @@
 import { raceStart } from "@/lib/f1";
+import { redisCommand, redisConfig } from "@/lib/redis";
 import type { StrategyForecast } from "@/lib/strategy-forecast";
 
 /**
@@ -11,11 +12,13 @@ import type { StrategyForecast } from "@/lib/strategy-forecast";
  * week. Completed rounds are scored against their stored call; rounds from
  * before the log existed fall back to a replay.
  *
- * Storage is the deployment's R2 bucket (`NEXT_INC_CACHE_R2_BUCKET`, the same
- * one the rate-limit counters use), one JSON object per season per model. There
- * is no database to provision and nothing to migrate. Under plain `next dev`
- * there is no Worker binding, so the log goes to `.cache/pre-race-log/` instead,
- * which keeps local checks honest across a server restart; last resort is memory.
+ * Storage is the shared Upstash Redis (`lib/redis.ts`, the credentials the
+ * rate-limit counters use), one JSON value per season per model. That matters
+ * more here than for a counter: the entry is frozen by one instance and has to
+ * be the entry the next request reads, or "written before the race" means
+ * nothing. With no database, the log falls back to the R2 binding on a Worker,
+ * then to `.cache/pre-race-log/` under plain `next dev` (which keeps local
+ * checks honest across a server restart); last resort is memory.
  */
 
 export type SavedPlan = {
@@ -140,6 +143,21 @@ async function writeLocal<T>(name: string, log: SeasonLog<T>): Promise<void> {
 async function readSeason<T>(name: string, season: number): Promise<SeasonLog<T>> {
   const memoryKey = `${name}:${season}`;
 
+  const config = redisConfig();
+  if (config) {
+    try {
+      const raw = await redisCommand(config, ["GET", keyFor(name, season)]);
+      if (typeof raw === "string" && raw) {
+        const data = JSON.parse(raw) as Partial<SeasonLog<T>>;
+        if (data && data.entries && typeof data.entries === "object") {
+          return { season, entries: data.entries };
+        }
+      }
+    } catch (error) {
+      console.warn(`[pre-race-log] ${name} redis read failed`, error);
+    }
+  }
+
   const store = await bucketStore();
   if (store) {
     try {
@@ -165,6 +183,16 @@ async function readSeason<T>(name: string, season: number): Promise<SeasonLog<T>
 
 async function writeSeason<T>(name: string, log: SeasonLog<T>): Promise<void> {
   memoryLog().set(`${name}:${log.season}`, log as SeasonLog<unknown>);
+
+  const config = redisConfig();
+  if (config) {
+    try {
+      await redisCommand(config, ["SET", keyFor(name, log.season), JSON.stringify(log)]);
+    } catch (error) {
+      console.warn(`[pre-race-log] ${name} redis write failed`, error);
+    }
+    return;
+  }
 
   const store = await bucketStore();
   if (store) {

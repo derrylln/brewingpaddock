@@ -127,8 +127,10 @@ of the top ten, and whether the favourite's shape matched.
 
 The forecast is **frozen before the race**. The first time the next race's
 forecast is built before the lights go out, `lib/pre-race-log.ts` writes it to
-the deployment's R2 bucket (`bp-forecast/<season>.json`) and never touches that
-entry again, so retuning the model cannot rewrite what was called that week. The
+the shared Upstash store (`bp-forecast/<season>.json`, the same database as the
+rate-limit counters) and never touches that entry again, so retuning the model
+cannot rewrite what was called that week. Local development has no database, so
+the log goes to `.cache/pre-race-log/` there instead. The
 stored entry keeps every priced plan, not just the favourite, so a later model
 can be compared with the call actually made. `GET /api/strategy/forecast`
 freezes the call; if nobody opens the forecast before the race, that round has
@@ -183,8 +185,8 @@ To go live:
 2. Create a Meta app at developers.facebook.com with the **Instagram** product and
    the `instagram_business_basic` permission, then generate a long-lived access
    token for @brewingpaddock.
-3. Store it as a secret named `INSTAGRAM_TOKEN` — on Freebuff Sites under **Sites →
-   Secrets**, on your own Worker with `wrangler secret put INSTAGRAM_TOKEN`.
+3. Store it as an environment variable named `INSTAGRAM_TOKEN` under **Project →
+   Settings → Environment Variables** in Vercel, ticked for Production and Preview.
 4. Redeploy. `GET /api/instagram` shows what the section is serving (source:
    `instagram` or `curated`).
 
