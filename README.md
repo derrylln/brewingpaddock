@@ -49,8 +49,8 @@ sprints), both drivers, and the exact lap for each. Everything comes from OpenF1
 | `GET /api/telemetry` | the fastest two laps of the latest race (first paint) |
 
 OpenF1 throttles bursts, so the whole path is cached in two layers (`lib/cache.ts`):
-the isolate's memory and Next's data cache (`unstable_cache`, backed by the
-deployment's R2 incremental cache), which survives isolate churn. Sessions live
+the isolate's memory and Next's data cache (`unstable_cache`), which survives
+instance churn. Sessions live
 15 minutes, lap and driver lists 30 minutes, a single lap's car trace an hour,
 and a chosen pair five minutes — so switching sessions is normally a cache hit,
 not an upstream call. The browser is told the same with `Cache-Control`
@@ -62,8 +62,13 @@ with `429` and `Retry-After`. On top of that, the site as a whole will only make
 12 model calls a minute and 120 an hour, so a public link cannot run up a bill
 even if the per-visitor buckets are dodged. Visitors are identified by a first-party `bp-vid` cookie (the
 platform does not forward the client IP, so IP is only a fallback for cookie-less
-requests), and the counters live in R2 rather than isolate memory — requests land
-on fresh isolates, so in-memory buckets never fill. This is a fairness valve, not
+requests), and the counters live in a shared Redis rather than instance memory —
+requests land on fresh instances, so in-memory buckets never fill. Set
+`UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (the Vercel Upstash
+integration injects `KV_REST_API_URL` and `KV_REST_API_TOKEN`; both names are
+read) and every instance counts into the same buckets. Without either, the
+counters fall back to per-instance memory, which still stops one instance
+hammering upstream but is looser than a real limit. This is a fairness valve, not
 security: it stops one person clicking through sessions from spending the OpenF1
 allowance the whole site shares.
 
@@ -228,7 +233,9 @@ Each module ships a deterministic model that owns the numbers — stint simulati
 retrieval over the season archive. A language model adds the written read on top. It never computes a
 result, and every prompt is handed only the data block the models produced.
 
-AI is off until a key is present. On Freebuff Sites, add these under **Sites → Secrets** and redeploy:
+AI is off until a key is present. On Vercel, add these under **Project → Settings →
+Environment Variables**, ticked for both Production and Preview, then redeploy (new values are
+not applied to an existing deployment):
 
 | Variable | Required | Default |
 | --- | --- | --- |
@@ -256,9 +263,14 @@ Where it plugs in:
 
 Without a key, or if a call fails or the budget is spent, each surface falls back to the computed
 read and labels itself `model only` rather than erroring. Generation is throttled per visitor
-(6/minute and 30/hour) and for the site as a whole (12/minute and 120/hour), counted in the
-deployment's R2 bucket rather than isolate memory, so a public link cannot spend the owner's
-credits without bound.
+(6/minute and 30/hour) and for the site as a whole (12/minute and 120/hour), counted in shared
+Redis rather than instance memory, so a public link cannot spend the owner's credits without
+bound. The Redis variables are the `UPSTASH_REDIS_REST_*` pair described under
+[Telemetry](#telemetry); without them the site-wide cap is only per instance.
+
+These Vercel variables cover the runtime panels only. The `/papers` job runs in GitHub Actions,
+which cannot see them — it reads `GEMINI_API_KEY` from the **repository secret** instead (see
+[The FIA papers](#the-fia-papers)).
 
 ## The FIA papers
 
@@ -273,9 +285,15 @@ their text with `unpdf`. One model call then classifies the whole batch and writ
 
 The `.github/workflows/fia-reports.yml` action runs it once a day (and on demand) and commits the
 JSON. That is the whole cost model: **one model pass per day, saved to the repo** — opening or
-refreshing the page never calls a model. Set the `GEMINI_API_KEY` repository secret to turn the
-model read on; `AI_MODEL` is optional. Run it locally with `npm run reports:sync`, or pin an event
-with `FIA_EVENT="Las Vegas Grand Prix" npm run reports:sync`.
+refreshing the page never calls a model.
+
+That model pass happens on a GitHub runner, not on the deployment, so its key comes from the
+repository, not from Vercel: **Settings → Secrets and variables → Actions → New repository
+secret**, name `GEMINI_API_KEY`. A Vercel environment variable is not visible to the workflow, and
+the workflow secret is not visible to the site — the two are set separately. `AI_MODEL` is an
+optional repository **variable**; leave it unset to keep `gemini-3.5-flash-lite`. Run it locally
+with `GEMINI_API_KEY=… npm run reports:sync` (or a local `.env`), or pin an event with
+`FIA_EVENT="Las Vegas Grand Prix" npm run reports:sync`.
 
 Once the key exists, every document still carrying a `rules` reading is re-read — including the
 previous round's archive, so turning the key on upgrades the backlog without a manual step. The
@@ -289,27 +307,37 @@ PDF cannot be fetched at all is still classified from its title, with a warning 
 The papers annotate the race; they are deliberately not an input to the forecast or predictor
 numbers. `npm run build` imports the committed JSON directly, so the page is static.
 
-## Deploying to your own Cloudflare account
+## Deploying to Vercel
 
-The repo is wired for Cloudflare **Workers Builds** (Git integration): push to `main` and Cloudflare
-builds and deploys. No Cloudflare token and no GitHub Actions secret lives in this repository.
+Vercel builds and serves the Next.js app directly: no adapter, no Worker bundle, no `wrangler`.
+Pushing to `main` deploys, and no Cloudflare credentials exist in this repository.
 
-1. Create the ISR cache: **Storage & databases → Workers KV → Create instance**, named
-   `brewing-paddock-cache`. Copy its **ID** and paste it into `wrangler.jsonc` in place of the zeros in
-   `NEXT_INC_CACHE_KV`. KV is free and needs no payment method — unlike R2, which is why the cache is
-   on KV here. The per-visitor counters also live in R2 (`NEXT_INC_CACHE_R2_BUCKET`); on a KV-only
-   account they fall back to per-isolate memory, which still throttles a burst but is looser than the
-   hosted preview.
-2. **Workers & Pages → Create → Worker → Connect to Git**, pick `derrylln/brewingpaddock`, branch `main`.
-3. Name the Worker **`brewing-paddock`** — it must match `name` in `wrangler.jsonc` or the build fails.
-4. Build command: `npm run build:worker` · Deploy command: `npm run deploy:worker`.
-5. **Settings → Variables and Secrets** → add `GEMINI_API_KEY`. Without it the site still runs; the
-   analysis panels show the computed read tagged `model only`.
-6. Push a commit (or Deployments → Retry) to build and deploy.
+1. **Vercel → Add New → Project**, import `derrylln/brewingpaddock`, branch `main`. The framework
+   preset is detected as Next.js; build command `npm run build`, install `npm install`, output
+   `.next`. Nothing else needs overriding.
+2. **Project → Settings → Environment Variables**, ticked for Production **and** Preview:
+   - `GEMINI_API_KEY` — turns the written analysis and the assistant's rephrasing on. Without it the
+     site still runs; each panel shows the computed read tagged `model only`.
+   - `AI_MODEL` — optional. Leave it unset for `gemini-3.5-flash-lite`.
+   - `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` — **Storage → Marketplace → Upstash for
+     Redis** (free tier), connected to the project; the integration writes these names, or the
+     `KV_REST_API_URL` / `KV_REST_API_TOKEN` pair, both of which are read. This is what makes the
+     per-visitor and site-wide counters hold across instances; without it they are per instance.
+3. **Deployments → Redeploy** after adding or changing a variable: Vercel does not inject new values
+   into a deployment that already exists.
+4. The daily **FIA papers** workflow commits `data/fia-reports.json`, and that push is what triggers
+   the rebuild — new readings ship with no manual deploy step. Note this is a *second* copy of the
+   key: `GEMINI_API_KEY` as a GitHub repository secret for the workflow, and as a Vercel environment
+   variable for the runtime panels. Setting one does not set the other.
 
-Free-plan allowances in play: Workers Builds 3,000 build minutes/month, Workers 100,000 requests/day,
-Workers KV (100,000 reads + 1,000 writes/day), and SQLite-backed Durable Objects on the free tier. No
-payment method and no paid plan are required anywhere in this setup.
+`/papers` is a static page over the committed JSON, so it needs no runtime key at all.
+
+Hobby allowances in play: function execution is metered (100 GB-hours a month), the data cache is
+part of the deployment, and Upstash's free tier covers 500k commands a month — ample for these
+counters.
+
+`wrangler.jsonc` and the `build:worker` / `deploy:worker` scripts are kept for a self-hosted
+Cloudflare Workers deploy; Vercel ignores them, and nothing in this README's Vercel path needs them.
 
 The Freebuff preview at `freebuff.page` is a separate deployment with its own secret; publishing
 there is unaffected by any of the above.

@@ -11,10 +11,16 @@ import { NextResponse } from "next/server";
  * only a fallback for cookie-less traffic — and if neither exists the throttle
  * steps aside rather than lumping every visitor into one bucket.
  *
- * Counters live in the deployment's R2 bucket (`NEXT_INC_CACHE_R2_BUCKET`), not
- * isolate memory: requests are spread across fresh isolates, so an in-memory
- * bucket never accumulates and a "limit" that never fires is worse than none.
- * When the binding is absent (plain `next dev`), it falls back to memory.
+ * Counters must live outside the instance: requests land on fresh instances, so
+ * an in-memory bucket never accumulates and a "limit" that never fires is worse
+ * than none. On Vercel the store is Upstash Redis over its REST API
+ * (`UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`; the Vercel integration's
+ * `KV_REST_API_URL` + `KV_REST_API_TOKEN` are accepted too), counted with a
+ * fixed window of INCR against a key that carries its own TTL.
+ *
+ * On Cloudflare Workers the older R2 binding (`NEXT_INC_CACHE_R2_BUCKET`) is
+ * still used when present, so a self-hosted Workers deploy keeps working. With
+ * neither configured (plain `next dev`) the counters fall back to memory.
  */
 
 type Bucket = { hits: number[] };
@@ -22,13 +28,16 @@ type R2Like = {
   get(key: string): Promise<{ json(): Promise<unknown> } | null>;
   put(key: string, value: string): Promise<unknown>;
 };
+type Store = { kind: "redis"; url: string; token: string } | { kind: "r2"; bucket: R2Like };
 
 const memory = new Map<string, Bucket>();
 const COOKIE = "bp-vid";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 const KEY_PREFIX = "bp-ratelimit";
+/** Redis calls are on the request path; do not let a slow store hold it open. */
+const REDIS_TIMEOUT_MS = 2_500;
 let lastSweep = Date.now();
-let resolvedStore: R2Like | null | undefined;
+let resolvedStore: Store | null | undefined;
 
 function sweep(now: number): void {
   if (now - lastSweep < 60_000) return;
@@ -40,18 +49,71 @@ function sweep(now: number): void {
   }
 }
 
-async function store(): Promise<R2Like | null> {
+function env(...names: string[]): string {
+  for (const name of names) {
+    const value = (process.env[name] ?? "").trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+async function store(): Promise<Store | null> {
   if (resolvedStore !== undefined) return resolvedStore;
+
+  const url = env("UPSTASH_REDIS_REST_URL", "KV_REST_API_URL");
+  const token = env("UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN");
+  if (url && token) {
+    resolvedStore = { kind: "redis", url: url.replace(/\/+$/, ""), token };
+    return resolvedStore;
+  }
+
   try {
     const { getCloudflareContext } = await import("@opennextjs/cloudflare");
     const ctx = await getCloudflareContext({ async: true });
-    const env = (ctx?.env ?? {}) as Record<string, unknown>;
-    const candidate = env.NEXT_INC_CACHE_R2_BUCKET as R2Like | undefined;
-    resolvedStore = candidate && typeof candidate.get === "function" ? candidate : null;
+    const bindings = (ctx?.env ?? {}) as Record<string, unknown>;
+    const candidate = bindings.NEXT_INC_CACHE_R2_BUCKET as R2Like | undefined;
+    if (candidate && typeof candidate.get === "function") {
+      resolvedStore = { kind: "r2", bucket: candidate };
+      return resolvedStore;
+    }
   } catch {
-    resolvedStore = null;
+    // Not running on Workers: no binding to find.
   }
+
+  resolvedStore = null;
   return resolvedStore;
+}
+
+/**
+ * One REST round trip: create the window if it is missing, count the hit, read
+ * the clock left. `SET … NX` sets the TTL once, so the window is fixed rather
+ * than sliding — a visitor hammering the endpoint still gets a fresh allowance
+ * when the window ends instead of being locked out forever.
+ */
+async function redisCount(store: { url: string; token: string }, key: string, windowMs: number) {
+  const res = await fetch(`${store.url}/pipeline`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${store.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify([
+      ["SET", key, 0, "PX", windowMs, "NX"],
+      ["INCR", key],
+      ["PTTL", key],
+    ]),
+    signal: AbortSignal.timeout(REDIS_TIMEOUT_MS),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`upstash ${res.status}`);
+  const data = (await res.json()) as Array<{ result?: unknown; error?: string }>;
+  if (!Array.isArray(data) || data.some((entry) => entry?.error)) {
+    throw new Error("upstash pipeline rejected the counters");
+  }
+  const count = Number(data[1]?.result);
+  const ttl = Number(data[2]?.result);
+  if (!Number.isFinite(count) || count < 1) throw new Error("upstash returned no counter");
+  return { count, ttl: Number.isFinite(ttl) && ttl > 0 ? ttl : windowMs };
 }
 
 export function clientKey(request: Request): string | null {
@@ -82,34 +144,28 @@ function decide(hits: number[], limit: number, windowMs: number, now: number): L
   return { ok: true, remaining: limit - recent.length - 1 };
 }
 
-export async function rateLimit(
-  scope: string,
-  identity: string,
-  limit: number,
-  windowMs = 60_000,
-): Promise<LimitResult> {
+/** Last resort and `next dev`: per-instance buckets, swept so they cannot grow. */
+function memoryLimit(key: string, limit: number, windowMs: number): LimitResult {
   const now = Date.now();
-  const key = `${scope}:${identity}`;
-  const durable = await store();
-
-  if (!durable) {
-    sweep(now);
-    const bucket = memory.get(key) ?? { hits: [] };
-    const verdict = decide(bucket.hits, limit, windowMs, now);
-    if (!verdict.ok) {
-      memory.set(key, { hits: bucket.hits.filter((at) => now - at < windowMs) });
-      return verdict;
-    }
-    bucket.hits = bucket.hits.filter((at) => now - at < windowMs);
-    bucket.hits.push(now);
-    memory.set(key, bucket);
+  sweep(now);
+  const bucket = memory.get(key) ?? { hits: [] };
+  const verdict = decide(bucket.hits, limit, windowMs, now);
+  if (!verdict.ok) {
+    memory.set(key, { hits: bucket.hits.filter((at) => now - at < windowMs) });
     return verdict;
   }
+  bucket.hits = bucket.hits.filter((at) => now - at < windowMs);
+  bucket.hits.push(now);
+  memory.set(key, bucket);
+  return verdict;
+}
 
-  const objectKey = `${KEY_PREFIX}/${scope}/${encodeURIComponent(identity)}.json`;
+async function r2Limit(bucketStore: R2Like, key: string, limit: number, windowMs: number) {
+  const now = Date.now();
+  const objectKey = `${KEY_PREFIX}/${key.replace(":", "/")}.json`;
   let hits: number[] = [];
   try {
-    const existing = await durable.get(objectKey);
+    const existing = await bucketStore.get(objectKey);
     if (existing) {
       const data = (await existing.json()) as { hits?: unknown };
       if (Array.isArray(data?.hits)) {
@@ -124,11 +180,38 @@ export async function rateLimit(
   if (!verdict.ok) return verdict;
 
   try {
-    await durable.put(objectKey, JSON.stringify({ hits: [...hits, now] }));
+    await bucketStore.put(objectKey, JSON.stringify({ hits: [...hits, now] }));
   } catch {
     // Same for writes: the request is allowed, the counter is just best-effort.
   }
   return verdict;
+}
+
+export async function rateLimit(
+  scope: string,
+  identity: string,
+  limit: number,
+  windowMs = 60_000,
+): Promise<LimitResult> {
+  const key = `${scope}:${identity}`;
+  const durable = await store();
+
+  if (durable?.kind === "redis") {
+    try {
+      const { count, ttl } = await redisCount(durable, `${KEY_PREFIX}:${key}`, windowMs);
+      if (count > limit) {
+        return { ok: false, retryAfter: Math.max(1, Math.ceil(ttl / 1000)) };
+      }
+      return { ok: true, remaining: Math.max(0, limit - count) };
+    } catch (error) {
+      // A store outage should not take the site down; the instance still counts.
+      console.error("[rate-limit] redis unavailable, counting in memory", error);
+      return memoryLimit(key, limit, windowMs);
+    }
+  }
+
+  if (durable?.kind === "r2") return r2Limit(durable.bucket, key, limit, windowMs);
+  return memoryLimit(key, limit, windowMs);
 }
 
 export function limitedResponse(retryAfter: number): NextResponse {
