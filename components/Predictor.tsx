@@ -16,15 +16,35 @@ const MINUTE = 60_000;
 /**
  * How long to wait before asking the model again.
  *
- * Around the qualifying session the board is about to change, so it is checked
- * every minute from five minutes before the session until the grid has landed.
- * The rest of the weekend it is checked at the pace the forecast rebuilds.
+ * The cadence is set by the budgets, not by impatience. Every poll is a function
+ * invocation and two counted rate-limit windows on the visitor's AI bucket (6 a
+ * minute, 30 an hour), so once a minute would spend an hour's allowance in
+ * thirty minutes and then lock the visitor out of the read for the rest of it.
+ *
+ * Five minutes around qualifying (twelve an hour, 40% of the hourly bucket) and
+ * fifteen minutes otherwise (four an hour) leave room for reloads and the other
+ * AI panels. It also matches the server, which holds a board for five minutes:
+ * polling faster would only re-read the same payload.
  */
 function nextDelay(qualiAt: string | undefined, onThisWeekend: boolean): number {
-  if (onThisWeekend) return 10 * MINUTE;
+  if (onThisWeekend) return 15 * MINUTE;
   const start = qualiAt ? Date.parse(qualiAt) : Number.NaN;
-  if (Number.isFinite(start) && Date.now() >= start - 5 * MINUTE) return MINUTE;
-  return 10 * MINUTE;
+  if (Number.isFinite(start) && Date.now() >= start - 5 * MINUTE) return 5 * MINUTE;
+  return 15 * MINUTE;
+}
+
+/**
+ * A refused poll is a budget signal, not an outage: this route shares the
+ * visitor's AI bucket, so retrying inside a minute would spend the window it was
+ * refused by. Honour the wait the server asks for, within five to fifteen
+ * minutes.
+ */
+function retryDelay(header: string | null): number {
+  const asked = Number(header);
+  if (Number.isFinite(asked) && asked > 0) {
+    return Math.min(15, Math.max(5, Math.ceil(asked / 60))) * MINUTE;
+  }
+  return 5 * MINUTE;
 }
 
 export default function Predictor() {
@@ -36,35 +56,60 @@ export default function Predictor() {
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let last = 0;
     let loaded = false;
 
-    const tick = async () => {
+    async function tick() {
+      let wait: number;
       try {
         const res = await fetch("/api/predict", { cache: "no-store" });
-        if (!res.ok) throw new Error("The model could not load the season data.");
-        const payload = (await res.json()) as Prediction & {
-          read?: AiRead;
-          notes?: PapersNotes;
-        };
-        if (!alive) return;
-        loaded = true;
-        setData(payload);
-        setError(null);
-        timer = setTimeout(
-          tick,
-          nextDelay(payload.race.qualiAt, payload.weekend.quali === "this-weekend"),
-        );
-      } catch (err) {
+        if (!res.ok) {
+          if (!loaded) setError("The model could not load the season data.");
+          wait = retryDelay(res.headers.get("Retry-After"));
+        } else {
+          const payload = (await res.json()) as Prediction & {
+            read?: AiRead;
+            notes?: PapersNotes;
+          };
+          if (!alive) return;
+          loaded = true;
+          setData(payload);
+          setError(null);
+          wait = nextDelay(payload.race.qualiAt, payload.weekend.quali === "this-weekend");
+        }
+      } catch {
         if (!alive) return;
         // A refresh that fails never throws away a board already on screen.
-        if (!loaded) setError((err as Error).message);
-        timer = setTimeout(tick, MINUTE);
+        if (!loaded) setError("The model could not load the season data.");
+        wait = 5 * MINUTE;
       }
-    };
+      last = Date.now();
+      schedule(wait);
+    }
 
+    function schedule(ms: number) {
+      if (timer) clearTimeout(timer);
+      timer = undefined;
+      // A background tab has no reader, so it stops polling and costs nothing
+      // until it is looked at again; onVisible restarts the clock.
+      if (!alive || document.visibilityState === "hidden") return;
+      timer = setTimeout(tick, ms);
+    }
+
+    function onVisible() {
+      // Refocusing is not a reason to poll: wait out the rest of the interval,
+      // but never longer than the base one.
+      if (document.visibilityState === "visible") {
+        schedule(Math.max(0, MINUTE - (Date.now() - last)));
+      }
+    }
+
+    document.addEventListener("visibilitychange", onVisible);
     void tick();
+
     return () => {
       alive = false;
+      document.removeEventListener("visibilitychange", onVisible);
       if (timer) clearTimeout(timer);
     };
   }, []);

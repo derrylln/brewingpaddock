@@ -185,9 +185,16 @@ a visitor to reload:
 - The written read is memoised on the board it describes (round, qualifying
   source and top driver), not on the round alone, so the narrative is rewritten
   rather than left describing the pre-qualifying order.
-- `/predict` polls itself: every minute from five minutes before the scheduled
-  session until the grid is in, and every ten minutes otherwise. A failed
-  refresh never replaces a board already on screen.
+- `/predict` polls itself, at a cadence set by the budgets rather than by
+  impatience: every five minutes from five minutes before the scheduled session
+  until the grid is in, and every fifteen minutes otherwise. The route shares the
+  visitor's AI bucket (6 a minute, 30 an hour), so once a minute would have spent
+  the hourly allowance in half an hour and then locked that visitor out of the
+  read; twelve polls an hour during qualifying leave the bucket room. The poll
+  matches the server's five-minute hold, so nothing is lost by waiting. A hidden
+  tab stops polling and restarts on focus, and a refused (`429`) poll waits the
+  `Retry-After` it was given instead of burning the next window. A failed refresh
+  never replaces a board already on screen.
 
 ## Instagram feed
 
