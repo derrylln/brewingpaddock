@@ -60,7 +60,7 @@ export default async function HomePage() {
           </div>
 
           {nextRace ? (
-            <div className="next-strip ticks">
+            <div className="next-strip">
               <span className="mono kicker-red">Next</span>
               <span className="next-strip-race">{nextRace.raceName.replace(" Grand Prix", "")}</span>
               <span className="mono next-strip-meta">{raceDay(nextRace.date)}</span>

@@ -81,7 +81,7 @@ export default function Predictor() {
 
       <div className="podium-cards">
         {podium.map((row, index) => (
-          <div className="podium-card ticks" key={row.code} style={{ borderTopColor: row.colour }}>
+          <div className="podium-card" key={row.code} style={{ borderTopColor: row.colour }}>
             <div className="podium-pos mono">P{index + 1}</div>
             <h3 className="podium-name">{row.name}</h3>
             <p className="podium-team">{row.team}</p>

@@ -149,7 +149,7 @@ export default async function RacePage({ params }: Props) {
             </div>
 
             {debrief ? (
-              <section className="debrief panel ticks">
+              <section className="debrief panel">
                 <div className="debrief-head">
                   <div>
                     <p className="mono kicker-red">Automated debrief</p>

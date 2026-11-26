@@ -556,34 +556,6 @@ button {
   padding: 24px;
 }
 
-.ticks {
-  position: relative;
-}
-
-.ticks::before,
-.ticks::after {
-  content: "";
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border: 1px solid rgba(225, 6, 0, 0.65);
-  pointer-events: none;
-}
-
-.ticks::before {
-  top: -1px;
-  right: -1px;
-  border-left: 0;
-  border-bottom: 0;
-}
-
-.ticks::after {
-  bottom: -1px;
-  left: -1px;
-  border-right: 0;
-  border-top: 0;
-}
-
 .race-card-head {
   display: flex;
   justify-content: space-between;
@@ -2715,6 +2687,20 @@ select.input {
   color: var(--red-bright);
 }
 
+/* The debrief copy runs the full panel width, which leaves a ~150 character
+   measure on a desktop. Flow it into two columns up there so the lines stay
+   readable while the section still spans edge to edge. */
+@media (min-width: 1100px) {
+  .debrief-body {
+    columns: 2;
+    column-gap: 56px;
+  }
+
+  .debrief-body p {
+    break-inside: avoid-column;
+  }
+}
+
 .tag-row {
   display: flex;
   flex-wrap: wrap;
@@ -3101,6 +3087,11 @@ select.input {
     padding: 20px;
   }
 
+  .pipeline {
+    justify-content: flex-start;
+    max-width: none;
+  }
+
   .debrief-stats {
     grid-template-columns: 1fr;
   }
@@ -3217,6 +3208,24 @@ select.input {
 
 .debrief-ai .ai-read p {
   margin: 0;
+}
+
+/* Same full-width measure inside the debrief: split the read into two columns
+   on desktop. Set here, after the grid rule above, so display stays block. */
+@media (min-width: 1100px) {
+  .debrief-ai .ai-read {
+    display: block;
+    columns: 2;
+    column-gap: 56px;
+  }
+
+  .debrief-ai .ai-read p {
+    break-inside: avoid-column;
+  }
+
+  .debrief-ai .ai-read p + p {
+    margin-top: 12px;
+  }
 }
 
 @media (max-width: 620px) {
