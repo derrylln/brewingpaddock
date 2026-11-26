@@ -397,40 +397,49 @@ async function callModel(
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
     for (const model of models) {
-      const body = {
-        model,
-        temperature: 0.2,
-        max_tokens: maxTokens,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-      };
-      if (gemini) body.reasoning_effort = "minimal";
+      // A Gemini host can still reject reasoning_effort, so a single model gets
+      // a second pass without it before the next model is spent on the batch.
+      let withReasoning = gemini;
+      for (let pass = 0; pass < 2; pass++) {
+        const body = {
+          model,
+          temperature: 0.2,
+          max_tokens: maxTokens,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+        };
+        if (withReasoning) body.reasoning_effort = "minimal";
 
-      try {
-        const res = await fetch(`${base}/chat/completions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(60_000),
-        });
-        if (!res.ok) {
-          const detail = (await res.text()).slice(0, 200);
-          log(`ai ${model} -> ${res.status} ${detail}`);
-          // An endpoint that rejects reasoning_effort still answers without it.
-          if (res.status === 400 && /reasoning_effort|thinking/i.test(detail)) body.reasoning_effort = undefined;
-          continue;
+        try {
+          const res = await fetch(`${base}/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(60_000),
+          });
+          if (!res.ok) {
+            const detail = (await res.text()).slice(0, 200);
+            log(`ai ${model} -> ${res.status} ${detail}`);
+            if (pass === 0 && withReasoning && res.status === 400 && /reasoning_effort|thinking/i.test(detail)) {
+              log(`ai ${model} rejected reasoning_effort; retrying it without`);
+              withReasoning = false;
+              continue;
+            }
+            break;
+          }
+          const data = await res.json();
+          const raw = (data.choices?.[0]?.message?.content ?? "").trim();
+          if (!raw) {
+            log(`ai ${model} -> empty response`);
+            break;
+          }
+          return { json: parseJson(raw), model };
+        } catch (error) {
+          log(`ai ${model} attempt ${attempt} failed: ${error.message}`);
+          break;
         }
-        const data = await res.json();
-        const raw = (data.choices?.[0]?.message?.content ?? "").trim();
-        if (!raw) {
-          log(`ai ${model} -> empty response`);
-          continue;
-        }
-        return { json: parseJson(raw), model };
-      } catch (error) {
-        log(`ai ${model} attempt ${attempt} failed: ${error.message}`);
       }
     }
     if (attempt < attempts) await sleep(1_500 * attempt);
