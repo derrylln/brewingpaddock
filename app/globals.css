@@ -3173,7 +3173,6 @@ select.input {
 
 .ai-panel .ai-read {
   margin: 0;
-  max-width: 72ch;
   color: var(--ink-2);
   line-height: 1.65;
 }
