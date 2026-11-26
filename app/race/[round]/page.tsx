@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AiReadText from "@/components/AiReadText";
 import { debriefRead } from "@/lib/ai-reads";
 import { buildDebrief } from "@/lib/debrief";
 import { fmtLap, raceDay } from "@/lib/format";
@@ -191,7 +192,7 @@ export default async function RacePage({ params }: Props) {
                     <p className="mono kicker-red">
                       AI read {aiRead.model ? `· ${aiRead.model}` : null}
                     </p>
-                    <p className="debrief-deck">{aiRead.text}</p>
+                    <AiReadText className="debrief-deck" text={aiRead.text} />
                   </div>
                 ) : null}
 
