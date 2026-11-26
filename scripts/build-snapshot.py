@@ -8,17 +8,40 @@ limited), so every server-rendered page falls back to this file. Regenerate with
 """
 import json
 import sys
+import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
 BASE = "https://api.jolpi.ca/ergast/f1"
 UA = {"User-Agent": "BrewingPaddock/1.0 (snapshot)"}
 
+# Jolpica answers a burst with 429s, and a partial answer used to quietly write
+# empty pit logs into the snapshot. Requests are spaced, retried with backoff,
+# and the writer keeps whatever the previous snapshot already held.
+_last_call = 0.0
 
-def get(path):
-    req = urllib.request.Request(f"{BASE}/{path}", headers=UA)
-    with urllib.request.urlopen(req, timeout=45) as res:
-        return json.load(res)
+
+def get(path, attempts=4):
+    global _last_call
+    for attempt in range(attempts):
+        wait = max(0.0, _last_call + 0.7 - time.time())
+        if wait:
+            time.sleep(wait)
+        _last_call = time.time()
+        req = urllib.request.Request(f"{BASE}/{path}", headers=UA)
+        try:
+            with urllib.request.urlopen(req, timeout=45) as res:
+                return json.load(res)
+        except urllib.error.HTTPError as error:
+            if error.code not in (429, 500, 502, 503, 504) or attempt == attempts - 1:
+                raise
+            time.sleep(4 * (attempt + 1))
+        except (urllib.error.URLError, TimeoutError):
+            if attempt == attempts - 1:
+                raise
+            time.sleep(3 * (attempt + 1))
+    raise RuntimeError(f"gave up on {path}")
 
 
 def trim_driver(d):
@@ -128,10 +151,20 @@ def main():
     for entry in season_results.values():
         entry["results"].sort(key=lambda r: int(r["position"]))
 
+    # Keep the previous snapshot's per-round bundles: a failed re-fetch must not
+    # erase pit logs that were already captured.
+    previous = {}
+    try:
+        with open("data/snapshot.json") as f:
+            previous = json.load(f).get("races", {})
+    except Exception:
+        previous = {}
+
     races = {}
     for entry in season_results.values():
         rnd = entry["round"]
         bundle = {}
+        kept = previous.get(str(rnd), {})
         try:
             quali = get(f"{season}/{rnd}/qualifying.json?limit=40")
             qlist = quali["MRData"]["RaceTable"]["Races"][0].get("QualifyingResults", [])
@@ -145,7 +178,7 @@ def main():
                 for q in qlist
             ]
         except Exception:
-            bundle["quali"] = []
+            bundle["quali"] = kept.get("quali", [])
         try:
             pits = get(f"{season}/{rnd}/pitstops.json?limit=200")
             plist = pits["MRData"]["RaceTable"]["Races"][0].get("PitStops", [])
@@ -153,8 +186,10 @@ def main():
                 {"driverId": p["driverId"], "duration": p["duration"], "lap": p["lap"], "stop": p["stop"]}
                 for p in plist
             ]
+            if not bundle["pits"]:
+                bundle["pits"] = kept.get("pits", [])
         except Exception:
-            bundle["pits"] = []
+            bundle["pits"] = kept.get("pits", [])
         races[str(rnd)] = bundle
 
     snapshot = {

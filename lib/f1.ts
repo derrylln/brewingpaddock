@@ -169,8 +169,12 @@ function release() {
   if (next) next();
 }
 
-async function requestJson<T>(path: string, revalidate = REVALIDATE): Promise<T | null> {
-  if (Date.now() < cooldownUntil) return null;
+async function requestJson<T>(
+  path: string,
+  revalidate = REVALIDATE,
+  options: { ignoreCooldown?: boolean } = {},
+): Promise<T | null> {
+  if (!options.ignoreCooldown && Date.now() < cooldownUntil) return null;
 
   await acquire();
   try {
@@ -285,6 +289,26 @@ export const getQualifying = cache(
     return SNAPSHOT.races[String(round)]?.quali ?? [];
   },
 );
+
+/**
+ * One round's pit log, fetched even while the shared cooldown is active.
+ *
+ * The record panel cannot be silently short a round, and that is exactly what
+ * happens when a burst of season requests trips Jolpica's rate limit: the
+ * cooldown answers every later call with null. A single round is cheap enough to
+ * ask for directly.
+ */
+export async function fetchPitStopsDirect(
+  season: number,
+  round: number | string,
+): Promise<PitStop[]> {
+  const data = await requestJson<Envelope<PitEnvelope>>(
+    `${season}/${round}/pitstops.json?limit=200`,
+    REVALIDATE,
+    { ignoreCooldown: true },
+  );
+  return data?.MRData.RaceTable?.Races?.[0]?.PitStops ?? [];
+}
 
 export const getPitStops = cache(
   async (season: number, round: number | string): Promise<PitStop[]> => {

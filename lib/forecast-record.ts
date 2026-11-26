@@ -2,7 +2,9 @@ import { cached } from "@/lib/cache";
 import { readForecastLog, type SavedForecast } from "@/lib/pre-race-log";
 import {
   SNAPSHOT,
+  fetchPitStopsDirect,
   getPitStops,
+  getRaceResults,
   getSchedule,
   getSeasonResults,
   isFinisher,
@@ -124,7 +126,7 @@ function replayCall(season: number, race: Race): Promise<PredictedCall | null> {
 }
 
 export function getForecastRecord(): Promise<ForecastRecord> {
-  return cached("forecast:record", 30 * 60_000, async () => {
+  return cached("forecast:record:v2", 30 * 60_000, async () => {
     const season = await resolveSeason();
     const [schedule, log] = await Promise.all([getSchedule(season), readForecastLog(season)]);
 
@@ -137,11 +139,23 @@ export function getForecastRecord(): Promise<ForecastRecord> {
     const results = new Map(
       season === SNAPSHOT.season ? SNAPSHOT.seasonResults.map((entry) => [entry.round, entry]) : [],
     );
-    const covered = completed.every(
-      (race) => (results.get(Number(race.round))?.results.length ?? 0) > 0,
+    const missing = completed.filter(
+      (race) => (results.get(Number(race.round))?.results.length ?? 0) === 0,
     );
-    if (!covered) {
+    // A single new round does not justify paging the whole season: that is five
+    // requests, and one 429 used to leave the newest round missing entirely.
+    if (missing.length > 3) {
       for (const entry of await getSeasonResults(season)) results.set(entry.round, entry);
+    }
+    // Anything still absent — a short page, a cooldown — is asked for on its own.
+    // A round the panel is about to score cannot be dropped silently.
+    for (const race of missing) {
+      const round = Number(race.round);
+      if ((results.get(round)?.results.length ?? 0) > 0) continue;
+      const live = await getRaceResults(season, round);
+      if (live.length > 0) {
+        results.set(round, { round, raceName: race.raceName, results: live });
+      }
     }
 
     // Pit logs, in parallel, and only over the wire where the snapshot has none.
@@ -150,7 +164,9 @@ export function getForecastRecord(): Promise<ForecastRecord> {
         completed.map(async (race): Promise<[number, PitStop[]]> => {
           const round = Number(race.round);
           const local = snapshotPits(season, round);
-          return [round, local.length > 0 ? local : await getPitStops(season, round)];
+          if (local.length > 0) return [round, local];
+          const live = await getPitStops(season, round);
+          return [round, live.length > 0 ? live : await fetchPitStopsDirect(season, round)];
         }),
       ),
     );
