@@ -168,8 +168,9 @@ rate and top-ten hit rate across the last eight rounds.
 The ranking is frozen before the race by the same log (`bp-predict/<season>.json`)
 and `savePrediction`, so rounds called after this shipped are marked `saved` and
 cannot be rewritten by a retune. Older rounds are `replay`: the five factors are
-run on the data available at the time — every round before the target, with that
-race's grid standing in for a qualifying session the archive does not keep.
+run on the data available at the time — every round before the target, plus that
+round's archived qualifying session, so the replay scores the same grid and lap
+deltas the board scores rather than approximating them with grid slots.
 
 Two things the factor gets wrong if left alone. Inside the qualifying factor the
 freshest session carries 85% of the weight (`LATEST_QUALI_WEIGHT`, shared with the

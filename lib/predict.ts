@@ -121,6 +121,41 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/**
+ * Run the race `sims` times and return win/podium/points rates per row, in the
+ * order the rows were given. Seeded, so the same field always answers the same
+ * way — the board, the sanity check and any calibration replay agree.
+ */
+export function simulateField(
+  rows: Array<{ score: number; dnfRisk: number }>,
+  sims = 4000,
+  seed = 2026,
+): Array<{ win: number; podium: number; points: number }> {
+  const rand = mulberry32(seed);
+  const counts = rows.map(() => ({ win: 0, podium: 0, points: 0 }));
+
+  for (let sim = 0; sim < sims; sim += 1) {
+    const order = rows.map((row, index) => ({
+      index,
+      perf: row.score * 5 + gumbel(rand) * 0.9,
+      dnf: rand() < row.dnfRisk ? 1 : 0,
+    }));
+    order.sort((a, b) => a.dnf - b.dnf || b.perf - a.perf);
+    order.forEach((entry, position) => {
+      if (entry.dnf) return;
+      if (position === 0) counts[entry.index].win += 1;
+      if (position < 3) counts[entry.index].podium += 1;
+      if (position < 10) counts[entry.index].points += 1;
+    });
+  }
+
+  return counts.map((count) => ({
+    win: count.win / sims,
+    podium: count.podium / sims,
+    points: count.points / sims,
+  }));
+}
+
 function stdev(values: number[]): number {
   if (values.length < 2) return 3;
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
@@ -290,34 +325,17 @@ export async function buildPrediction(): Promise<Prediction> {
   });
 
   const sims = 4000;
-  const rand = mulberry32(2026);
-  const counts = rows.map(() => ({ win: 0, podium: 0, points: 0 }));
-
-  for (let sim = 0; sim < sims; sim += 1) {
-    const order = rows.map((row, index) => ({
-      index,
-      perf: row.score * 5 + gumbel(rand) * 0.9,
-      dnf: rand() < row.dnfRisk ? 1 : 0,
-    }));
-    order.sort((a, b) => a.dnf - b.dnf || b.perf - a.perf);
-    order.forEach((entry, position) => {
-      if (entry.dnf) return;
-      if (position === 0) counts[entry.index].win += 1;
-      if (position < 3) counts[entry.index].podium += 1;
-      if (position < 10) counts[entry.index].points += 1;
-    });
-  }
-
+  const outcomes = simulateField(rows, sims);
   rows.forEach((row, index) => {
-    row.win = counts[index].win / sims;
-    row.podium = counts[index].podium / sims;
-    row.points = counts[index].points / sims;
+    row.win = outcomes[index].win;
+    row.podium = outcomes[index].podium;
+    row.points = outcomes[index].points;
   });
   rows.sort((a, b) => b.win - a.win || b.score - a.score);
 
   // The sanity check walks forward: the field is ranked on the rounds *before*
-  // the target, with that race's grid standing in for qualifying, so the result
-  // cannot leak into its own inputs.
+  // the target and that round's own qualifying session, so the result cannot
+  // leak into its own inputs.
   let backtest: Backtest | null = null;
   if (overview.lastRace) {
     const targetRound = Number(overview.lastRace.round);
@@ -326,7 +344,11 @@ export async function buildPrediction(): Promise<Prediction> {
       .filter((round) => round.round < targetRound)
       .sort((a, b) => a.round - b.round);
     if (target && target.results.length > 0 && history.length > 0) {
-      const predicted = rankFromHistory(history, target.results, WEIGHTS, W_RECENCY).slice(0, 3);
+      const archived = await getQualifying(season, targetRound).catch(() => []);
+      const latestQuali = archived.length > 0 ? qualifyingSessionScores(archived) : undefined;
+      const predicted = rankFromHistory(history, target.results, WEIGHTS, W_RECENCY, {
+        latestQuali,
+      }).slice(0, 3);
       const actual = target.results
         .filter((result) => /^\d+$/.test(result.positionText))
         .sort((a, b) => Number(a.position) - Number(b.position))

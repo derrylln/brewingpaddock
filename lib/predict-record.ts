@@ -2,13 +2,14 @@ import recordedCalls from "@/data/recorded-calls.json";
 import { cached } from "@/lib/cache";
 import {
   SNAPSHOT,
+  getQualifying,
   getSchedule,
   getSeasonResults,
   raceFinished,
   resolveSeason,
   type RaceResult,
 } from "@/lib/f1";
-import { W_RECENCY, WEIGHTS } from "@/lib/predict";
+import { W_RECENCY, WEIGHTS, qualifyingSessionScores } from "@/lib/predict";
 import { codeOf, rankFromHistory } from "@/lib/walk-forward";
 import { readPredictLog, type SavedPrediction } from "@/lib/pre-race-log";
 
@@ -20,9 +21,9 @@ import { readPredictLog, type SavedPrediction } from "@/lib/pre-race-log";
  * - `saved`: the ranking was frozen in `lib/pre-race-log.ts` before the race,
  *   so a later retune cannot rewrite it.
  * - `replay`: no saved call exists for that round, so the model's weights are
- *   run on the data available at the time — every round before it, with that
- *   race's grid standing in for the latest qualifying session, which the archive
- *   does not keep for old rounds.
+ *   run on the data available at the time — every round before it, plus that
+ *   round's archived qualifying session (laps and grid), so the replay scores
+ *   the same input the board scored.
  *
  * The live model ranks drivers by simulated win probability. For the record the
  * same five weighted factors are applied to the historic state and ranked
@@ -94,7 +95,7 @@ function classified(results: RaceResult[]): RaceResult[] {
 }
 
 export function getPredictRecord(): Promise<PredictRecord> {
-  return cached("predict:record:v2", 30 * 60_000, async () => {
+  return cached("predict:record:v3", 30 * 60_000, async () => {
     const season = await resolveSeason();
     const [schedule, log] = await Promise.all([getSchedule(season), readPredictLog(season)]);
 
@@ -123,16 +124,21 @@ export function getPredictRecord(): Promise<PredictRecord> {
       const frozen = log.entries[String(round)];
       const recorded = RECORDED[String(season)]?.[String(round)];
       const source = frozen || recorded ? "saved" : "replay";
-      const predicted = frozen
-        ? frozen.ranking.map((entry) => entry.code)
-        : recorded
-          ? recorded.top.map((entry) => entry.code)
-          : rankFromHistory(
-              ordered.filter((entry) => entry.round < round),
-              target.results,
-              WEIGHTS,
-              W_RECENCY,
-            );
+      let predicted: string[];
+      if (frozen) {
+        predicted = frozen.ranking.map((entry) => entry.code);
+      } else if (recorded) {
+        predicted = recorded.top.map((entry) => entry.code);
+      } else {
+        const archived = await getQualifying(season, round).catch(() => []);
+        predicted = rankFromHistory(
+          ordered.filter((entry) => entry.round < round),
+          target.results,
+          WEIGHTS,
+          W_RECENCY,
+          { latestQuali: archived.length > 0 ? qualifyingSessionScores(archived) : undefined },
+        );
+      }
       if (predicted.length === 0) continue;
 
       const podium = classified(target.results)
@@ -184,7 +190,7 @@ export function getPredictRecord(): Promise<PredictRecord> {
       top10Rate: fullCalls.length === 0 ? null : top10Hits / (fullCalls.length * 10),
       top10Rounds: fullCalls.length,
       locked,
-      note: "Calls written down before the race are scored as they were made and marked saved: a ranking frozen in the log, or a board transcribed from the published page, which covers the top three only. Rounds without one are replayed with the model's five factors on the data available at the time — the rounds before it, plus that race's grid in place of a qualifying session the archive no longer holds — and marked replay. A replay is a re-scoring rather than a call, so it cannot be a called winner. Podium and top-ten hits are measured against the classification.",
+      note: "Calls written down before the race are scored as they were made and marked saved: a ranking frozen in the log, or a board transcribed from the published page, which covers the top three only. Rounds without one are replayed with the model's five factors on the data available at the time — the rounds before it, plus that race's own qualifying session — and marked replay. A replay is a re-scoring rather than a call, so it cannot be a called winner. Podium and top-ten hits are measured against the classification.",
     };
   });
 }
