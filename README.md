@@ -171,6 +171,15 @@ cannot be rewritten by a retune. Older rounds are `replay`: the five factors are
 run on the data available at the time — every round before the target, with that
 race's grid standing in for a qualifying session the archive does not keep.
 
+Two things the factor gets wrong if left alone. Inside the qualifying factor the
+freshest session carries three quarters of the weight (`LATEST_QUALI_WEIGHT`),
+with the rolling grid average carrying the rest: the grid is set hours before the
+race, in this car at this track, and diluting it 60/40 meant a back-row start
+still scored most of a pole lap's factor. And the board models the cars entered
+this weekend — the last completed round's classification — not everyone who has
+started a race all season, so the simulation does not spread probability over
+stand-ins for a 22-car grid.
+
 **The board rebuilds itself once qualifying lands.** Qualifying pace is 28% of the
 score, so a ranking simulated on last round's grid is wrong the moment this
 weekend's session ends — a pole-sitter is not still the favourite because the

@@ -92,6 +92,16 @@ function stdev(values: number[]): number {
 
 export const WEIGHTS = { quali: 0.28, form: 0.36, team: 0.14, consistency: 0.12, champ: 0.1 };
 export const W_RECENCY = [0.1, 0.15, 0.2, 0.25, 0.3];
+/**
+ * Share of the qualifying factor that the freshest session owns.
+ *
+ * The grid is set hours before the race, in this car, at this track, so it is the
+ * strongest single input on the board. Diluting it with a rolling average of past
+ * grids made a back-row start barely matter: last place still scored most of a
+ * pole lap's factor, and the simulation kept handing that car a podium. The
+ * rolling average is the season-long signal, and it still carries a quarter.
+ */
+export const LATEST_QUALI_WEIGHT = 0.75;
 
 /**
  * True once this weekend's qualifying has landed upstream. A board built before
@@ -131,7 +141,19 @@ export async function buildPrediction(): Promise<Prediction> {
       ? "previous-round"
       : "none";
 
-  const standings = overview.standings;
+  // The standings carry everyone who started a race this season — stand-ins and
+  // one-off replacements included — so a 22-car grid was being modelled as 25
+  // cars. The last completed round's classification is the surest entry list
+  // available here, and the board should only spend probability on cars that are
+  // actually entered this weekend.
+  const lastRound = seasonResults.at(-1);
+  const entered = lastRound
+    ? new Set(lastRound.results.map((result) => result.Driver.driverId))
+    : null;
+  const standings =
+    entered && entered.size >= 16
+      ? overview.standings.filter((entry) => entered.has(entry.driver.driverId))
+      : overview.standings;
   const leaderTeamPoints = Math.max(1, constructors[0]?.points ?? 1);
   const teamPoints = new Map(constructors.map((c) => [c.constructor.constructorId, c.points]));
 
@@ -225,7 +247,8 @@ export async function buildPrediction(): Promise<Prediction> {
     // Qualifying pace: a rolling grid average plus the latest session available.
     const rollingQuali = Math.min(1, Math.max(0, (21 - weightedGrid) / 20));
     const latestQuali = latestQualiMap.get(driver.driverId) ?? rollingQuali;
-    const qualiScore = rollingQuali * 0.6 + latestQuali * 0.4;
+    const qualiScore =
+      rollingQuali * (1 - LATEST_QUALI_WEIGHT) + latestQuali * LATEST_QUALI_WEIGHT;
 
     const champ = 1 - (entry.position - 1) / Math.max(1, standings.length - 1);
     const consistency = Math.exp(-stdev(last5) / 4.5);
