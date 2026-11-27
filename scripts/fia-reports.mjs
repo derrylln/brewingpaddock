@@ -651,9 +651,13 @@ async function main() {
     for (const [index, chunk] of chunks.entries()) {
       const said = await classifyChunk(event, chunk);
       if (!said) {
-        throw new Error(
-          `model failed on chunk ${index + 1}/${chunks.length}; refusing to save a busy weekend as rule readings`,
+        // One bad model call must not cost the day: the documents still land,
+        // tagged as rule readings, and the next keyed run upgrades them in
+        // place. A frozen page is worse than a coarser one.
+        log(
+          `warning: model failed on chunk ${index + 1}/${chunks.length}; those documents keep rule readings`,
         );
+        continue;
       }
       aiModel = said.model;
       for (const [id, row] of said.rows) classified.set(id, row);
@@ -671,8 +675,8 @@ async function main() {
     }
     const missing = targets.filter((doc) => !classified.has(doc.id));
     if (missing.length > 0) {
-      throw new Error(
-        `model left ${missing.length} document(s) unclassified (${missing.map((doc) => doc.id).join(", ")}); refusing to save rule readings`,
+      log(
+        `warning: model left ${missing.length} document(s) unclassified (${missing.map((doc) => doc.id).join(", ")}); they keep rule readings until the next keyed run`,
       );
     }
   } else if (!keyed) {
@@ -740,6 +744,9 @@ async function main() {
   // there was something new to read; otherwise the previous one is kept.
   let read = previous.read ?? null;
   let readSource = previous.readSource ?? null;
+  // What the stored read actually describes; null on files written before this
+  // was recorded, and the page treats a missing stamp as "no claim either way".
+  let readCoveredAt = previous.readCoveredAt ?? null;
   let teams = Array.isArray(previous.teams) ? previous.teams : [];
   if (keyed && targets.length > 0 && currentDocs.length > 0) {
     const summary = await summarise({ name: event.name, round: race.round }, currentDocs);
@@ -747,6 +754,7 @@ async function main() {
       read = summary.read;
       teams = summary.teams;
       readSource = "ai";
+      readCoveredAt = currentDocs[0]?.publishedAt ?? top;
       aiModel = summary.model ?? aiModel;
     } else {
       log("warning: the summary call failed; keeping the previous paddock read");
@@ -768,6 +776,7 @@ async function main() {
     model: aiModel ?? previous.model ?? null,
     read: read ?? fallbackRead,
     readSource: readSource ?? (fallbackRead ? "rules" : null),
+    readCoveredAt,
     teams,
     documents: kept.map((doc) => {
       const { text, rawTitle, ...rest } = doc;

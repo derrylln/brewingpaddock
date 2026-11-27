@@ -4,6 +4,7 @@ import {
   IMPACT_LABEL,
   REPORTS,
   eventDocuments,
+  readStaleness,
   reportDate,
   watchDocuments,
 } from "@/lib/fia-reports";
@@ -20,6 +21,7 @@ export default function PapersPage() {
   const watch = watchDocuments(4);
   const latest = current[0] ?? REPORTS.documents[0] ?? null;
   const ai = REPORTS.readSource === "ai";
+  const staleness = readStaleness();
 
   return (
     <div className="page">
@@ -73,6 +75,12 @@ export default function PapersPage() {
             {REPORTS.read ??
               "No papers for the next race yet. The FIA usually opens the event documents a few days before first practice."}
           </p>
+          {staleness.stale ? (
+            <p className="papers-read-stale mono">
+              {staleness.newer} document{staleness.newer === 1 ? "" : "s"} published since this
+              read — the next model pass rewrites it. The list below is current.
+            </p>
+          ) : null}
           {watch.length > 0 ? (
             <ul className="papers-watch">
               {watch.map((doc) => (

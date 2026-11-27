@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-27T01:30:40.147Z",
+  "generatedAt": "2026-11-27T01:46:28.389Z",
   "event": {
     "name": "Qatar Grand Prix",
     "round": 22,
@@ -12,6 +12,7 @@
   "model": "gemini-3.5-flash-lite",
   "read": "The FIA has officially approved the event permit and issued standard power unit operational limits for the Qatar Grand Prix. Teams must also strictly adhere to Pirelli's mandated tire pressure and camber guidelines throughout the weekend as scrutineers monitor compliance.",
   "readSource": "ai",
+  "readCoveredAt": "2026-11-25T15:05:00+01:00",
   "teams": [],
   "documents": [
     {

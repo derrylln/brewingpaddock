@@ -54,6 +54,8 @@ export type FiaReports = {
   model: string | null;
   read: string | null;
   readSource: "ai" | "rules" | null;
+  /** Published time of the newest document the read was written from. */
+  readCoveredAt: string | null;
   teams: Array<{ team: string; flag: "upgrade" | "penalty" | "info"; note: string }>;
   documents: FiaDocument[];
 };
@@ -103,6 +105,27 @@ export function watchDocuments(limit = 4): FiaDocument[] {
         (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""),
     )
     .slice(0, limit);
+}
+
+/**
+ * The read only describes the documents that existed when it was written. The
+ * daily ingest can add papers after it — and a run without a model key keeps the
+ * old text rather than inventing a new one — so the page needs to know whether
+ * the paragraph has fallen behind the list.
+ */
+export function readStaleness(reports: FiaReports = REPORTS): {
+  stale: boolean;
+  newer: number;
+  since: string | null;
+} {
+  const covered = reports.readCoveredAt;
+  if (!covered || !reports.read) return { stale: false, newer: 0, since: null };
+  const cutoff = new Date(covered).getTime();
+  const newer = reports.documents.filter((doc) => {
+    const at = doc.publishedAt ? new Date(doc.publishedAt).getTime() : NaN;
+    return Number.isFinite(at) && at > cutoff;
+  }).length;
+  return { stale: newer > 0, newer, since: covered };
 }
 
 export function eventLabel(name?: string): string {
