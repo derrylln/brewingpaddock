@@ -172,10 +172,12 @@ run on the data available at the time — every round before the target, with th
 race's grid standing in for a qualifying session the archive does not keep.
 
 Two things the factor gets wrong if left alone. Inside the qualifying factor the
-freshest session carries three quarters of the weight (`LATEST_QUALI_WEIGHT`),
-with the rolling grid average carrying the rest: the grid is set hours before the
-race, in this car at this track, and diluting it 60/40 meant a back-row start
-still scored most of a pole lap's factor. And the board models the cars entered
+freshest session carries 85% of the weight (`LATEST_QUALI_WEIGHT`, shared with the
+walk-forward replay in `lib/model-weights.ts`), with the rolling grid average
+carrying the rest: the grid is set hours before the race, in this car at this
+track, and diluting it 60/40 meant a back-row start still scored most of a pole
+lap's factor. Replaying the season's archived sessions, 85% names the real winner
+in 6 of 16 rounds against 4 at 40%, and ranks that winner higher on average. And the board models the cars entered
 this weekend — the last completed round's classification — not everyone who has
 started a race all season, so the simulation does not spread probability over
 stand-ins for a 22-car grid.

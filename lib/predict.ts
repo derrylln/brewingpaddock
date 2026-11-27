@@ -7,8 +7,12 @@ import {
   raceStart,
   type Race,
 } from "@/lib/f1";
+import { LATEST_QUALI_WEIGHT, W_RECENCY, WEIGHTS } from "@/lib/model-weights";
+import type { QualifyingResult } from "@/lib/f1";
 import { teamColour, teamName } from "@/lib/teams";
 import { codeOf, rankFromHistory } from "@/lib/walk-forward";
+
+export { LATEST_QUALI_WEIGHT, W_RECENCY, WEIGHTS };
 
 export type Factor = { key: string; label: string; value: number };
 
@@ -68,6 +72,40 @@ function parseLap(value: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * The fresh session's score per driver: half stage-relative lap delta, half grid
+ * position. Stage-relative so Q1 track evolution is never penalised against dry
+ * Q3 rubber. Exported so the replay scores an archived session exactly as the
+ * live board scores the one in front of it.
+ */
+export function qualifyingSessionScores(quali: QualifyingResult[]): Map<string, number> {
+  const best = (stage: "Q1" | "Q2" | "Q3") =>
+    Math.min(...quali.map((row) => parseLap(row[stage])).filter((v): v is number => v !== null));
+  const bestQ3 = best("Q3");
+  const bestQ2 = best("Q2");
+  const bestQ1 = best("Q1");
+
+  const scores = new Map<string, number>();
+  for (const row of quali) {
+    const pos = Number(row.position) || 20;
+    const posScore = Math.max(0, (22 - pos) / 21);
+    let delta = 1.4;
+    if (row.Q3) {
+      const lap = parseLap(row.Q3);
+      if (lap && Number.isFinite(bestQ3)) delta = lap - bestQ3;
+    } else if (row.Q2) {
+      const lap = parseLap(row.Q2);
+      if (lap && Number.isFinite(bestQ2)) delta = 0.4 + (lap - bestQ2);
+    } else if (row.Q1) {
+      const lap = parseLap(row.Q1);
+      if (lap && Number.isFinite(bestQ1)) delta = 0.8 + (lap - bestQ1);
+    }
+    const deltaScore = Math.exp(-delta / 1.1);
+    scores.set(row.Driver.driverId, deltaScore * 0.5 + posScore * 0.5);
+  }
+  return scores;
+}
+
 function gumbel(rand: () => number): number {
   const u = Math.max(1e-9, rand());
   return -Math.log(-Math.log(u));
@@ -89,19 +127,6 @@ function stdev(values: number[]): number {
   const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length;
   return Math.sqrt(variance);
 }
-
-export const WEIGHTS = { quali: 0.28, form: 0.36, team: 0.14, consistency: 0.12, champ: 0.1 };
-export const W_RECENCY = [0.1, 0.15, 0.2, 0.25, 0.3];
-/**
- * Share of the qualifying factor that the freshest session owns.
- *
- * The grid is set hours before the race, in this car, at this track, so it is the
- * strongest single input on the board. Diluting it with a rolling average of past
- * grids made a back-row start barely matter: last place still scored most of a
- * pole lap's factor, and the simulation kept handing that car a podium. The
- * rolling average is the season-long signal, and it still carries a quarter.
- */
-export const LATEST_QUALI_WEIGHT = 0.75;
 
 /**
  * True once this weekend's qualifying has landed upstream. A board built before
@@ -168,29 +193,7 @@ export async function buildPrediction(): Promise<Prediction> {
   }
   const maxRecentTeam = Math.max(1, ...teamRecent.values());
 
-  // Stage-relative session deltas so Q1 track evolution is never penalized against dry Q3 rubber
-  const bestQ3 = Math.min(...quali.map((q) => parseLap(q.Q3)).filter((v): v is number => v !== null));
-  const bestQ2 = Math.min(...quali.map((q) => parseLap(q.Q2)).filter((v): v is number => v !== null));
-  const bestQ1 = Math.min(...quali.map((q) => parseLap(q.Q1)).filter((v): v is number => v !== null));
-
-  const latestQualiMap = new Map<string, number>();
-  for (const q of quali) {
-    const pos = Number(q.position) || 20;
-    const posScore = Math.max(0, (22 - pos) / 21);
-    let delta = 1.4;
-    if (q.Q3) {
-      const l = parseLap(q.Q3);
-      if (l && Number.isFinite(bestQ3)) delta = l - bestQ3;
-    } else if (q.Q2) {
-      const l = parseLap(q.Q2);
-      if (l && Number.isFinite(bestQ2)) delta = 0.4 + (l - bestQ2);
-    } else if (q.Q1) {
-      const l = parseLap(q.Q1);
-      if (l && Number.isFinite(bestQ1)) delta = 0.8 + (l - bestQ1);
-    }
-    const deltaScore = Math.exp(-delta / 1.1);
-    latestQualiMap.set(q.Driver.driverId, deltaScore * 0.5 + posScore * 0.5);
-  }
+  const latestQualiMap = qualifyingSessionScores(quali);
 
   const form = new Map<string, { positions: number[]; points: number[]; grids: number[]; dnf: number }>();
   for (const round of seasonResults.slice().sort((a, b) => a.round - b.round)) {

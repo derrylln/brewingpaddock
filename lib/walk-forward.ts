@@ -1,4 +1,5 @@
 import { isFinisher, type RaceResult, type SeasonResults } from "@/lib/f1";
+import { LATEST_QUALI_WEIGHT } from "@/lib/model-weights";
 
 /**
  * Walk-forward scoring.
@@ -38,6 +39,13 @@ type Form = { positions: number[]; points: number[]; grids: number[]; dnf: numbe
 
 export type ScoredDriver = { code: string; score: number; grid: number };
 
+export type HistoryOptions = {
+  /** The target round's fresh-session score per driver, when it is available. */
+  latestQuali?: Map<string, number>;
+  /** Override the blend, so alternatives can be replayed against the same rounds. */
+  latestWeight?: number;
+};
+
 /** Rank `entrants` (the target race's entry list, whose grids are already set)
  *  using only the rounds in `history`, which must all precede the target. */
 export function rankFromHistory(
@@ -45,8 +53,9 @@ export function rankFromHistory(
   entrants: RaceResult[],
   weights: DriverWeights,
   recency: RecencyWeights,
+  options: HistoryOptions = {},
 ): string[] {
-  return scoreFromHistory(history, entrants, weights, recency).map((row) => row.code);
+  return scoreFromHistory(history, entrants, weights, recency, options).map((row) => row.code);
 }
 
 /** The same five-factor score, keeping the numbers so callers can rank on them. */
@@ -55,7 +64,9 @@ export function scoreFromHistory(
   entrants: RaceResult[],
   weights: DriverWeights,
   recency: RecencyWeights,
+  options: HistoryOptions = {},
 ): ScoredDriver[] {
+  const latestWeight = options.latestWeight ?? LATEST_QUALI_WEIGHT;
   const form = new Map<string, Form>();
   const driverPoints = new Map<string, number>();
   const teamPoints = new Map<string, number>();
@@ -128,10 +139,11 @@ export function scoreFromHistory(
       const fullForm = formScore * 0.55 + finishScore * 0.3 + momentum * 0.15;
 
       const rollingQuali = Math.min(1, Math.max(0, (21 - weightedGrid) / 20));
-      // The grid is set before the race, so it stands in for the latest
-      // qualifying session on rounds where the archive has no lap times.
-      const latestQuali = Math.max(0, (22 - (grid.get(id) ?? 20)) / 21);
-      const qualiScore = rollingQuali * 0.6 + latestQuali * 0.4;
+      // The session's own scores when the caller has them; otherwise the grid,
+      // which is set before the race and is the same signal without the laps.
+      const latestQuali =
+        options.latestQuali?.get(id) ?? Math.max(0, (22 - (grid.get(id) ?? 20)) / 21);
+      const qualiScore = rollingQuali * (1 - latestWeight) + latestQuali * latestWeight;
 
       const position = champRank.get(id) ?? fieldSize;
       const champ = 1 - (position - 1) / Math.max(1, fieldSize - 1);
